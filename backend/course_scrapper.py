@@ -47,15 +47,18 @@ def getCourse(course, subject_sites):
         class_code = lecture.find("div", {"class": "title-subjectcode"}).get_text()
         code_digit = class_code[-4:]
         
+        class_title = lecture.find("div", {"class": "title-coursedescr"}).get_text()
+        
         class_url = url_prefix + f"/browse/roster/SP25/class/{course}/{code_digit}"
 
         class_data = getClassData(class_url)
-        class_data["class"] = class_code
+        class_data["course code"] = class_code
+        class_data["course title"] = class_title
         
         data.append(class_data)
     return
         
-def saveToCSV(data, filename="courses.csv"):
+def saveToCSV(data, filename="courses1.csv"):
     if not data:
         print("No data to save.")
         return
@@ -80,4 +83,4 @@ def saveToCSV(data, filename="courses.csv"):
 for subject, _ in subject_sites.items():
     print("Getting data for ", subject)
     getCourse(subject, subject_sites)
-# saveToCSV(data)
+saveToCSV(data)

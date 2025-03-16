@@ -1,0 +1,47 @@
+[
+    {
+        "overall": "5",
+        "difficulty": "3",
+        "workload": "3",
+        "professor": "Anne Bracy, David Gries",
+        "grade": "N/A",
+        "major": "N/A",
+        "comment": "Teaches a lot of very valuable/interesting stuff. The first half is basically just covering Java basics, so if you took APCS it's a lot of review. Lectures cover a lot of material and sometimes can go pretty fast."
+    },
+    {
+        "overall": "-",
+        "difficulty": "2",
+        "workload": "-",
+        "professor": "David Gries",
+        "grade": "N/A",
+        "major": "N/A",
+        "comment": "A really easy class with a doable amount of work, usually spend less than 3 hours on each assignment"
+    },
+    {
+        "overall": "5",
+        "difficulty": "2",
+        "workload": "2",
+        "professor": "David Gries",
+        "grade": "N/A",
+        "major": "N/A",
+        "comment": "I took it in Fall 2017. Weekly workload at most 5 hours a week for me. I got an A at the end."
+    },
+    {
+        "overall": "-",
+        "difficulty": "5",
+        "workload": "-",
+        "professor": "David Gries, Douglas James",
+        "grade": "N/A",
+        "major": "N/A",
+        "comment": "I found the class to be the hardest class I have ever taken at Cornell, and I am in engineering and have taken classes like math 1920 and Chem 2090 (those two were also hard for me but they were not as bad as 2110). I found the clsss to be disorganized and the lectures to be boring. I also had trouble with every single project and had a hard time finding good help. I am sure that the materials are helpful for CS majors (or minors), and they proabbly could be interesting if you like it. But as someone who is not a CS person, I really struggled in the class and did not have a good time :(("
+    },
+    {
+        "overall": "4",
+        "difficulty": "1",
+        "workload": "1",
+        "professor": "David Gries",
+        "grade": "N/A",
+        "major": "N/A",
+        "comment": "Gries is great, but the class is way too easy"
+    }
+]
