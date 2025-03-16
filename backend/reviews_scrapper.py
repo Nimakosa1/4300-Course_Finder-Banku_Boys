@@ -53,7 +53,7 @@ for course in df['class']:
     reviews[course] = data
 
 with open("course_reviews.json", "w") as f:
-    json.dump(data, f, indent=4)
+    json.dump(reviews, f, indent=4)
 print("Data saved to course_reviews.json")
 
 driver.quit()

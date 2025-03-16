@@ -83,4 +83,5 @@ def saveToCSV(data, filename="courses1.csv"):
 for subject, _ in subject_sites.items():
     print("Getting data for ", subject)
     getCourse(subject, subject_sites)
+    break
 saveToCSV(data)
