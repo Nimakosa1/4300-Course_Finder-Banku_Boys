@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 import requests
 import re
 import csv
+import json
 
 url = "https://classes.cornell.edu/browse/roster/SP25"
 page = requests.get(url)
@@ -35,7 +36,7 @@ def getClassData(url):
 
     return {"description": description, "term_offered": term_offered, "distributions": distributions}
 
-data = []
+data = {}
 def getCourse(course, subject_sites):
     course_url = subject_sites.get(course)
     course_page = requests.get(course_url)
@@ -52,10 +53,9 @@ def getCourse(course, subject_sites):
         class_url = url_prefix + f"/browse/roster/SP25/class/{course}/{code_digit}"
 
         class_data = getClassData(class_url)
-        class_data["course code"] = class_code
         class_data["course title"] = class_title
         
-        data.append(class_data)
+        data[class_code] = class_data
     return
         
 def saveToCSV(data, filename="courses1.csv"):
@@ -83,5 +83,7 @@ def saveToCSV(data, filename="courses1.csv"):
 for subject, _ in subject_sites.items():
     print("Getting data for ", subject)
     getCourse(subject, subject_sites)
-    break
-saveToCSV(data)
+
+with open("courses_info.json", "w") as f:
+    json.dump(data, f, indent= 4)
+print("Course info saved to courses_info.json")
