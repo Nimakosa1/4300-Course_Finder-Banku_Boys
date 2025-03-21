@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
+
 import json
 import os
 import sys
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
 from nltk.tokenize import TreebankWordTokenizer
@@ -13,6 +15,9 @@ import signal
 
 # Force production mode if not set externally
 os.environ.setdefault('FLASK_ENV', 'production')
+
+# Ensure NEXTJS_URL is set early before Flask route registration
+os.environ.setdefault('NEXTJS_URL', 'http://4300showcase.infosci.cornell.edu:5239')
 
 tokenizer = TreebankWordTokenizer()
 current_directory = os.path.dirname(os.path.abspath(__file__))
@@ -143,7 +148,6 @@ def run_nextjs():
         return None
 
 def deploy_app():
-    os.environ['NEXTJS_URL'] = 'http://4300showcase.infosci.cornell.edu:5239'
     port = int(os.environ.get('PORT', 5001))
     nextjs_process = run_nextjs()
 
@@ -203,5 +207,3 @@ if __name__ == '__main__':
     else:
         print("Running in production mode...")
         deploy_app()
-
-
