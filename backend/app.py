@@ -1,96 +1,15 @@
-# import json
-# import os
-# from flask import Flask, render_template, request
-# from flask_cors import CORS
-# from helpers.MySQLDatabaseHandler import MySQLDatabaseHandler
-# import pandas as pd
-# from sklearn.feature_extraction.text import TfidfVectorizer
-# from sklearn.metrics.pairwise import cosine_similarity
-# from similarity import build_inverted_index, compute_doc_norms, compute_idf, accumulate_dot_scores, search
-
-
-# from nltk.tokenize import TreebankWordTokenizer
-
-# # Initialize the tokenizer
-# tokenizer = TreebankWordTokenizer()
-
-# # ROOT_PATH for linking with all your files. 
-# # Feel free to use a config.py or settings.py with a global export variable
-# os.environ['ROOT_PATH'] = os.path.abspath(os.path.join("..",os.curdir))
-
-# # Get the directory of the current script
-# current_directory = os.path.dirname(os.path.abspath(__file__))
-
-# # Specify the path to the JSON file relative to the current script
-# json_file_path = os.path.join(current_directory, 'init.json')
-# courses_path = os.path.join(current_directory, 'courses_w_tokens.json')
-# reviews_path = os.path.join(current_directory, 'course_reviews.json')
-
-# # Assuming your JSON data is stored in a file named 'init.json'
-# with open(courses_path, 'r') as file:
-#     courses = json.load(file)
-# with open(reviews_path, 'r') as file:
-#     reviews = json.load(file)  
-
-# # merge coures and reviews
-# for code, data in courses.items():
-#     courses[code]["course_code"] = code
-#     courses[code]["reviews"] = reviews[code]
-# courses = [val for key, val in courses.items()]
-
-# app = Flask(__name__)
-# # CORS(app)
-# CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
-
-
-
-# inv_idx = build_inverted_index(courses)
-# idf = compute_idf(inv_idx, len(courses))
-# doc_norms = compute_doc_norms(inv_idx, idf, len(courses))
-# inv_idx = {key: val for key, val in inv_idx.items() if key in idf}
-
-# def getDescriptions(course_data):
-#     descriptions = []
-    
-#     for course, data in course_data.items():
-#         descriptions.append(data["description"])
-#     return descriptions
-
-# def json_search(query, inv_idx, idf, doc_norms):
-
-#     res = search(query, inv_idx, idf, doc_norms)
-#     return res
-
-
-# @app.route("/")
-# def home():
-#     return render_template('base.html',title="sample html")
-
-# @app.route("/get/courses", methods = ["POST"])
-# def courses_search():
-#     data = request.get_json().get("query")
-#     query_token = tokenizer.tokenize(data)
-    
-#     res = json_search(data, inv_idx, idf, doc_norms)[:10] # get top 10 results
-#     # result = [{"score": score, "courses": courses[idx]["course_code"]} for score, idx in res]
-#     result = [courses[idx] for score, idx in res]
-#     for idx, course in enumerate(result):
-#         del course["description_tokens"]
-#         result[idx] = course
-#     return result
-
-# if 'DB_NAME' not in os.environ:
-#     app.run(debug=True,host="0.0.0.0",port=5001)
-
-
-
 import json
 import os
-from flask import Flask, render_template, request, jsonify
+import sys
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pandas as pd
 from nltk.tokenize import TreebankWordTokenizer
 from similarity import build_inverted_index, compute_doc_norms, compute_idf, accumulate_dot_scores, search
+import subprocess
+import threading
+import time
+import signal
 
 tokenizer = TreebankWordTokenizer()
 
@@ -101,12 +20,17 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 courses_path = os.path.join(current_directory, 'courses_w_tokens.json')
 reviews_path = os.path.join(current_directory, 'course_reviews.json')
 
+# Path to Next.js build directory - using .next for server-side rendering
+frontend_dir = os.path.join(current_directory, '..', 'frontend')
+frontend_build_path = os.path.join(frontend_dir, '.next')
+
 try:
     with open(courses_path, 'r') as file:
         courses = json.load(file)
     with open(reviews_path, 'r') as file:
         reviews = json.load(file)
     
+    print(f"Loaded courses and reviews data")
  
 except Exception as e:
     print(f"Error loading data: {str(e)}")
@@ -125,9 +49,11 @@ except Exception as e:
     print(f"Error merging data: {str(e)}")
     courses_list = []
 
-app = Flask(__name__)
+# Create Flask app 
+app = Flask(__name__, static_folder=frontend_build_path)
 
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+# Enable CORS for API routes only
+CORS(app, resources={r"/api/*": {"origins": "*"}, r"/get/*": {"origins": "*"}}, supports_credentials=True)
 
 try:
     inv_idx = build_inverted_index(courses_list)
@@ -151,20 +77,14 @@ def json_search(query, inv_idx, idf, doc_norms):
         return []
 
 # Debug route to check if Flask is running
-@app.route("/test", methods=["GET"])
+@app.route("/api/test", methods=["GET"])
 def test():
     return jsonify({"status": "ok", "message": "Flask server is running"})
 
-# Home route
-@app.route("/")
-def home():
-    return jsonify({"message": "Welcome to CourseFinder API"})
-
 # Course search endpoint
-@app.route("/get/courses", methods=["POST"])
+@app.route("/api/courses/search", methods=["POST"])
 def courses_search():
     try:
-       
         request_json = request.get_json()
         print("Request JSON:", request_json)
         
@@ -222,10 +142,157 @@ def courses_search():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+# Legacy endpoint for compatibility
+@app.route("/get/courses", methods=["POST"])
+def get_courses():
+    return courses_search()
+
+# Proxy route for API calls in production
+@app.route('/api/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def api_proxy(path):
+    # This function will forward API requests to the appropriate handler
+    if path == 'courses/search':
+        return courses_search()
+    # Add more API endpoints as needed
+    return jsonify({"error": "API endpoint not found"}), 404
+
+# Function to run Next.js in production
+def run_nextjs():
+    try:
+        # Build Next.js app
+        print("Building Next.js app...")
+        subprocess.run(["npm", "run", "build"], cwd=frontend_dir, check=True)
+        
+        # Start Next.js server
+        print("Starting Next.js server...")
+        nextjs_process = subprocess.Popen(
+            ["npm", "start"],
+            cwd=frontend_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            bufsize=1
+        )
+        
+        # Print Next.js output
+        def print_nextjs_output():
+            for line in iter(nextjs_process.stdout.readline, ''):
+                print(f"NEXT.JS: {line}", end='')
+        
+        threading.Thread(target=print_nextjs_output, daemon=True).start()
+        
+        return nextjs_process
+    
+    except Exception as e:
+        print(f"Error starting Next.js: {e}")
+        return None
+
+# Deployment handler
+def deploy_app():
+    # Start Next.js server
+    os.environ['NEXTJS_URL'] = 'http://4300showcase.infosci.cornell.edu:5239'
+
+    nextjs_process = run_nextjs()
+    
+    if not nextjs_process:
+        print("Failed to start Next.js server")
+        sys.exit(1)
+    
+    # Get the port from environment variable or default to 5001
+    port = int(os.environ.get('PORT', 5001))
+    
+    # Set up clean termination handler
+    def signal_handler(sig, frame):
+        print("\nShutting down servers...")
+        if nextjs_process:
+            nextjs_process.terminate()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    # Start Flask with Waitress
+    try:
+        from waitress import serve
+        print(f"Starting Flask server on port {port}...")
+        serve(app, host="0.0.0.0", port=port)
+    except KeyboardInterrupt:
+        print("\nShutting down servers...")
+        if nextjs_process:
+            nextjs_process.terminate()
+        sys.exit(0)
+
+# Create a route to serve Next.js pages in production
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+# def serve_nextjs(path):
+#     if path.startswith('api/'):
+#         # Let Flask handle API routes
+#         return app.view_functions.get(request.endpoint)()
+    
+#     # For all other routes, proxy to Next.js server
+#     return jsonify({
+#         "message": "This path should be handled by Next.js server",
+#         "path": path,
+#         "info": "In production, configure a reverse proxy to route non-API traffic to Next.js"
+#     })
+
+def serve_nextjs(path):
+    if path.startswith('api/'):
+        # Let Flask handle API routes
+        return app.view_functions.get(request.endpoint)()
+    
+    # Check if we're in production or development
+    if os.getenv('FLASK_ENV') == 'production':
+        # In production, get the Next.js URL from an environment variable
+        # If not set, use a relative URL scheme that works with a reverse proxy
+        nextjs_url = os.environ.get('NEXTJS_URL', '')
+        
+        if not nextjs_url:
+            # If no URL is specified, assume we're behind a reverse proxy
+            # Return a message explaining how to configure this
+            return f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Configuration Needed</title>
+            </head>
+            <body>
+                <h1>Frontend Configuration Needed</h1>
+                <p>This route ({path}) should be handled by the Next.js frontend.</p>
+                <p>To fix this, either:</p>
+                <ol>
+                    <li>Set the NEXTJS_URL environment variable to point to your Next.js server</li>
+                    <li>Configure a reverse proxy (like Nginx) to route non-API traffic to your Next.js server</li>
+                </ol>
+            </body>
+            </html>
+            """
+    else:
+        # In development, redirect to localhost:3000
+        nextjs_url = 'http://localhost:3000'
+    
+    # Redirect to the Next.js server
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Redirecting to Application</title>
+        <meta http-equiv="refresh" content="0;URL='{nextjs_url}/{path}'">
+    </head>
+    <body>
+        <p>Redirecting to <a href="{nextjs_url}/{path}">{nextjs_url}/{path}</a>...</p>
+    </body>
+    </html>
+    """
+
 # Run the Flask app
 if __name__ == '__main__':
-    if 'DB_NAME' not in os.environ:
-        print("Starting Flask server on port 5001...")
+    if os.getenv('FLASK_ENV') != 'production':
+        # Development mode
+        print("Starting Flask server in development mode on port 5001...")
+        run_nextjs()
         app.run(debug=True, host="0.0.0.0", port=5001)
     else:
+        # Production mode
         print("Running in production mode...")
+        deploy_app()

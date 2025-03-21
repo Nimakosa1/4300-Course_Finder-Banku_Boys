@@ -1,81 +1,60 @@
-// app/api/courses/search/route.js
-export async function POST(request) {
+export async function POST(req) {
   try {
-    const body = await request.json();
-    const query = body.query;
+    // Get the Flask API URL from environment variables
+    const flaskApiUrl =
+      process.env.NEXT_PUBLIC_FLASK_API_URL || "http://localhost:5001";
 
-    if (!query) {
-      return new Response(JSON.stringify([]), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    // Get the request body
+    const body = await req.json();
 
-    // Use the Flask backend URL from environment or default to 5001
-    const flaskApiUrl = process.env.FLASK_API_URL || "http://localhost:5001";
+    console.log(
+      `Proxying request to Flask API: ${flaskApiUrl}/api/courses/search`
+    );
+    console.log(`Query: ${body.query}`);
 
-    console.log("Querying Flask API:", `${flaskApiUrl}/get/courses`);
-    console.log("Query:", query);
+    // Forward the request to the Flask API
+    const response = await fetch(`${flaskApiUrl}/api/courses/search`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
 
-    try {
-      const response = await fetch(`${flaskApiUrl}/get/courses`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ query }),
-      });
-
-      if (!response.ok) {
-        console.error("Flask API error:", response.status, response.statusText);
-        const errorText = await response.text();
-        console.error("Error text:", errorText);
-        throw new Error(
-          `Flask API returned ${response.status}: ${response.statusText}`
-        );
-      }
-
-      // Parse response as text first for debugging
-      const textResponse = await response.text();
-      console.log("Raw API response:", textResponse.substring(0, 200) + "...");
-
-      // Try to parse the text as JSON
-      let data;
-      try {
-        data = JSON.parse(textResponse);
-      } catch (parseError) {
-        console.error("Error parsing JSON:", parseError);
-        throw new Error(
-          `Invalid JSON response: ${textResponse.substring(0, 100)}...`
-        );
-      }
-
-      // Return the data
-      return new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    } catch (fetchError) {
-      console.error("Fetch error:", fetchError);
-      // Return a more useful error message
+    // Handle errors
+    if (!response.ok) {
+      console.error(`Flask API responded with status: ${response.status}`);
       return new Response(
         JSON.stringify({
-          error: fetchError.message,
+          error: `Flask API error: ${response.status}`,
           message:
             "Error connecting to Flask API. Make sure your Flask server is running on port 5001.",
         }),
         {
-          status: 500,
+          status: response.status,
           headers: { "Content-Type": "application/json" },
         }
       );
     }
-  } catch (error) {
-    console.error("General error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+
+    // Return the response from the Flask API
+    const data = await response.json();
+    return new Response(JSON.stringify(data), {
+      status: 200,
       headers: { "Content-Type": "application/json" },
     });
+  } catch (error) {
+    console.error("Proxy error:", error);
+    return new Response(
+      JSON.stringify({
+        error: `Failed to proxy request: ${error.message}`,
+        message:
+          "Error connecting to Flask API. Make sure your Flask server is running on port 5001.",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 }
