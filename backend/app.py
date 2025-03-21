@@ -14,12 +14,21 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 
 # Specify the path to the JSON file relative to the current script
 json_file_path = os.path.join(current_directory, 'init.json')
+courses_path = os.path.join(current_directory, 'courses_w_tokens.json')
+reviews_path = os.path.join(current_directory, 'course_reviews.json')
 
 # Assuming your JSON data is stored in a file named 'init.json'
+
 with open(json_file_path, 'r') as file:
     data = json.load(file)
     episodes_df = pd.DataFrame(data['episodes'])
     reviews_df = pd.DataFrame(data['reviews'])
+with open(courses_path, 'r') as file:
+    courses = json.load(file)
+
+with open(reviews_path, 'r') as file:
+    reviews = json.load(file)  
+
 
 app = Flask(__name__)
 CORS(app)
