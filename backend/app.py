@@ -27,21 +27,16 @@ courses_path = os.path.join(current_directory, 'courses_w_tokens.json')
 reviews_path = os.path.join(current_directory, 'course_reviews.json')
 
 # Assuming your JSON data is stored in a file named 'init.json'
-
-with open(json_file_path, 'r') as file:
-    data = json.load(file)
-    episodes_df = pd.DataFrame(data['episodes'])
-    reviews_df = pd.DataFrame(data['reviews'])
-
 with open(courses_path, 'r') as file:
     courses = json.load(file)
-for code, data in courses.items():
-    courses[code]["course_code"] = code
-courses = [val for key, val in courses.items()]
-
 with open(reviews_path, 'r') as file:
     reviews = json.load(file)  
 
+# merge coures and reviews
+for code, data in courses.items():
+    courses[code]["course_code"] = code
+    courses[code]["reviews"] = reviews[code]
+courses = [val for key, val in courses.items()]
 
 app = Flask(__name__)
 CORS(app)
@@ -62,7 +57,7 @@ def getDescriptions(course_data):
 def json_search(query, inv_idx, idf, doc_norms):
 
     res = search(query, inv_idx, idf, doc_norms)
-    return res[:10]
+    return res
 
 
 @app.route("/")
@@ -74,8 +69,12 @@ def courses_search():
     data = request.get_json().get("query")
     query_token = tokenizer.tokenize(data)
     
-    res = json_search(data, inv_idx, idf, doc_norms)
-    result = [{"score": score, "courses": courses[idx]["course_code"]} for score, idx in res]
+    res = json_search(data, inv_idx, idf, doc_norms)[:10] # get top 10 results
+    # result = [{"score": score, "courses": courses[idx]["course_code"]} for score, idx in res]
+    result = [courses[idx] for score, idx in res]
+    for idx, course in enumerate(result):
+        del course["description_tokens"]
+        result[idx] = course
     return result
 
 if 'DB_NAME' not in os.environ:
