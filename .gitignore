@@ -13,6 +13,8 @@ instance/
 .coverage
 htmlcov/
 
+try.py
+
 dist/
 build/
 *.egg-info/
