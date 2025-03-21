@@ -1,13 +1,18 @@
 // Function to search courses based on a query
+// Function to search courses based on a query
 export const searchCourses = async (query, setLoading) => {
   if (setLoading) setLoading(true);
   try {
     console.log("Searching for:", query);
 
-    // For debugging - log the API endpoint we're calling
-    console.log("API Endpoint:", "/api/courses/search");
+    // In development, use the environment variable
+    // In production, use a relative URL
+    const baseUrl = process.env.NEXT_PUBLIC_FLASK_API_URL || "";
+    const apiUrl = `${baseUrl}/api/courses/search`;
 
-    const response = await fetch("/api/courses/search", {
+    console.log("API Endpoint:", apiUrl);
+
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
