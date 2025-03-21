@@ -225,7 +225,7 @@ def courses_search():
 # Run the Flask app
 if __name__ == '__main__':
     if 'DB_NAME' not in os.environ:
-        print("Starting Flask server on port 5000...")
-        app.run(debug=True, host="0.0.0.0", port=5000)
+        print("Starting Flask server on port 5001...")
+        app.run(debug=True, host="0.0.0.0", port=5001)
     else:
         print("Running in production mode...")
