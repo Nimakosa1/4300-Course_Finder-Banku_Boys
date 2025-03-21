@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button";
 export default function SearchBar({ initialQuery = "" }) {
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const router = useRouter();
+
+  // Update searchQuery when initialQuery changes
+  useEffect(() => {
+    setSearchQuery(initialQuery);
+  }, [initialQuery]);
 
   const handleSearch = (e) => {
     e.preventDefault();

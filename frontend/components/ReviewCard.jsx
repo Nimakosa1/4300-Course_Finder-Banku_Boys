@@ -1,18 +1,22 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 
 export default function ReviewCard({ review }) {
   // Function to render star ratings
   const renderStars = (rating, maxRating = 5) => {
+    // Convert rating to number if it's a string
+    const numRating = typeof rating === 'string' ? 
+      (rating === '-' ? 0 : parseInt(rating)) : 
+      (rating || 0);
+    
     return (
       <div className="flex">
         {[...Array(maxRating)].map((_, i) => (
           <svg
             key={i}
             className={`w-5 h-5 ${
-              i < rating ? "text-yellow-400" : "text-gray-300"
+              i < numRating ? "text-yellow-400" : "text-gray-300"
             }`}
             fill="currentColor"
             viewBox="0 0 20 20"
@@ -24,31 +28,52 @@ export default function ReviewCard({ review }) {
     );
   };
 
+  // Check if we have a valid review
+  if (!review) return null;
+
   return (
     <Card>
       <CardContent className="p-4">
-        {review.professor && (
-        <div className="mb-2">
-          <div className="text-sm text-gray-600 font-medium">
-            Professor: {review.professor}
+        {review.professor && review.professor !== 'N/A' && (
+          <div className="mb-2">
+            <div className="text-sm text-gray-600 font-medium">
+              Professor: {review.professor}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {review.major && review.major !== 'N/A' && (
+          <div className="mb-2">
+            <div className="text-sm text-gray-600">
+              Major: {review.major}
+            </div>
+          </div>
+        )}
+
+        {review.grade && review.grade !== 'N/A' && (
+          <div className="mb-2">
+            <div className="text-sm text-gray-600">
+              Grade: {review.grade}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-4 mb-3">
-          <div className="flex items-center">
-            <span className="text-sm font-medium mr-2">Overall:</span>
-            {renderStars(review.rating || review.overall)}
-          </div>
+          {review.overall && review.overall !== '-' && (
+            <div className="flex items-center">
+              <span className="text-sm font-medium mr-2">Overall:</span>
+              {renderStars(review.overall)}
+            </div>
+          )}
           
-          {review.difficulty !== undefined && (
+          {review.difficulty && review.difficulty !== '-' && (
             <div className="flex items-center">
               <span className="text-sm font-medium mr-2">Difficulty:</span>
               {renderStars(review.difficulty)}
             </div>
           )}
           
-          {review.workload !== undefined && (
+          {review.workload && review.workload !== '-' && (
             <div className="flex items-center">
               <span className="text-sm font-medium mr-2">Workload:</span>
               {renderStars(review.workload)}
@@ -56,9 +81,9 @@ export default function ReviewCard({ review }) {
           )}
         </div>
 
-        <p className="text-gray-700 mb-3">{review.comment || review.reviewText}</p>
-
-       
+        {review.comment && (
+          <p className="text-gray-700 mb-3">{review.comment}</p>
+        )}
       </CardContent>
     </Card>
   );

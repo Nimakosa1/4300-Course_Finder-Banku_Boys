@@ -1,68 +1,80 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useParams, useSearchParams } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import ReviewCard from "@/components/ReviewCard";
+import { searchCourses, calculateAverageRatings } from "@/lib/search-utils";
 
-// Mock data for a class with updated schema
-const CLASS_DATA = {
-  id: 1,
-  classCode: "CS101",
-  title: "Introduction to Computer Science",
-  semester: ["Fall", "Spring"],
-  distribution: ["Science", "Technology"],
-  description:
-    "This course provides a comprehensive introduction to computer science principles, including basic programming concepts, algorithms, data structures, and problem-solving techniques. Students will learn fundamental programming skills using Python and apply computational thinking to real-world problems.",
-  details:
-    "The course is designed for students with little to no prior programming experience. It covers variables, data types, control structures, functions, object-oriented programming basics, and elementary algorithms. Weekly programming assignments reinforce concepts covered in lectures.",
-  enrollment:
-    "Limited to 150 students. Priority given to Computer Science majors and minors. Students from other departments require instructor permission.",
-  reviews: [
-    {
-      id: 1,
-      reviewer: "ComputerWhiz",
-      date: "2023-10-01",
-      overall: 5,
-      difficulty: 3,
-      workload: 4,
-      reviewText:
-        "Excellent introduction to CS concepts! The professor made difficult concepts accessible with clear explanations and helpful examples.",
-      professor: "Dr. Smith",
-      likes: 10,
-      dislikes: 1,
-    },
-    {
-      id: 2,
-      reviewer: "NewCoder22",
-      date: "2023-10-02",
-      overall: 4,
-      difficulty: 2,
-      workload: 3,
-      reviewText:
-        "Very informative and well-structured course. The assignments were challenging but doable. The professor was always available during office hours.",
-      professor: "Dr. Smith",
-      likes: 8,
-      dislikes: 2,
-    },
-    {
-      id: 3,
-      reviewer: "StemStudent",
-      date: "2023-10-03",
-      overall: 3,
-      difficulty: 4,
-      workload: 5,
-      reviewText:
-        "The content was interesting, but the pace was too fast for beginners. Could use more review sessions and practice problems.",
-      professor: "Dr. Johnson",
-      likes: 5,
-      dislikes: 3,
-    },
-  ],
-};
+export default function ClassDetailsPage() {
+  const [classData, setClassData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const classId = params?.id;
+  const passedData = searchParams.get("data");
 
-export default function ClassDetailsPage({ params }) {
-  const classId = params.id;
-  const classData = CLASS_DATA; // In a real app, you'd fetch this based on classId
+  useEffect(() => {
+    if (classId) {
+      // First check if data was passed via URL
+      if (passedData) {
+        try {
+          const parsedData = JSON.parse(passedData);
+          console.log("Using data passed from search page:", parsedData);
+          setClassData(parsedData);
+          setLoading(false);
+          return; // Skip API call if we have the data
+        } catch (e) {
+          console.error("Error parsing passed data:", e);
+          // Continue to fetch data if parsing failed
+        }
+      }
+
+      const loadCourseData = async () => {
+        setLoading(true);
+        setError(null);
+
+        try {
+          const originalClassId = classId.replace(/-/g, " ");
+
+          // Search for the course using the exact course code
+          const results = await searchCourses(originalClassId);
+
+          // Find the exact match
+          const courseInfo = results.find(
+            (course) => course.course_code === originalClassId
+          );
+
+          if (courseInfo) {
+            // Calculate average ratings
+            const ratings = calculateAverageRatings(courseInfo.reviews || []);
+
+            setClassData({
+              id: courseInfo.course_code,
+              classCode: courseInfo.course_code,
+              title: courseInfo["course title"] || "No Title",
+              description: courseInfo.description || "No description available",
+              semester: courseInfo.term_offered || [],
+              distribution: courseInfo.distributions || [],
+              reviews: courseInfo.reviews || [],
+              ...ratings,
+            });
+          } else {
+            setError("Course not found. Please check the course ID.");
+          }
+        } catch (error) {
+          console.error("Error loading course data:", error);
+          setError("Failed to load course data. Please try again later.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadCourseData();
+    }
+  }, [classId, passedData]);
 
   // Function to display distribution and semester tags
   const renderTags = (items, colorClass) => {
@@ -80,6 +92,43 @@ export default function ClassDetailsPage({ params }) {
     ) : null;
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <SearchBar />
+        <div className="max-w-7xl mx-auto p-4 mt-6 flex justify-center items-center">
+          <p className="text-lg">Loading class details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <SearchBar />
+        <div className="max-w-7xl mx-auto p-4 mt-6">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!classData) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <SearchBar />
+        <div className="max-w-7xl mx-auto p-4 mt-6">
+          <p className="text-lg text-center">
+            Course not found. Please check the course ID and try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Search bar at the top */}
@@ -87,7 +136,7 @@ export default function ClassDetailsPage({ params }) {
 
       {/* Class title and metadata */}
       <div className="max-w-7xl mx-auto p-4 mt-6">
-        <div className="mb-2 flex items-center">
+        <div className="mb-2 flex items-start">
           <span className="text-lg font-medium text-gray-500 mr-2">
             {classData.classCode}
           </span>
@@ -107,13 +156,42 @@ export default function ClassDetailsPage({ params }) {
                 <h2 className="text-2xl font-semibold mb-4">Description</h2>
                 <p className="text-gray-700 mb-6">{classData.description}</p>
 
-                <h2 className="text-2xl font-semibold mb-4">Other Details</h2>
-                <p className="text-gray-700 mb-6">{classData.details}</p>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="flex flex-col">
+                    <span className="text-lg font-semibold mb-1">
+                      Difficulty
+                    </span>
+                    <span className="text-gray-700">
+                      {classData.avgDifficulty > 0
+                        ? `${classData.avgDifficulty.toFixed(1)}/5`
+                        : "No data available"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-lg font-semibold mb-1">Workload</span>
+                    <span className="text-gray-700">
+                      {classData.avgWorkload > 0
+                        ? `${classData.avgWorkload.toFixed(1)}/5`
+                        : "No data available"}
+                    </span>
+                  </div>
+                </div>
+
+                <h2 className="text-2xl font-semibold mb-4">Terms Offered</h2>
+                <p className="text-gray-700 mb-6">
+                  {classData.semester && classData.semester.length > 0
+                    ? classData.semester.join(", ")
+                    : "No term information available"}
+                </p>
 
                 <h2 className="text-2xl font-semibold mb-4">
-                  Enrollment Information
+                  Distribution Requirements
                 </h2>
-                <p className="text-gray-700">{classData.enrollment}</p>
+                <p className="text-gray-700">
+                  {classData.distribution && classData.distribution.length > 0
+                    ? classData.distribution.join(", ")
+                    : "No distribution information available"}
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -123,9 +201,15 @@ export default function ClassDetailsPage({ params }) {
         <div className="md:col-span-5">
           <h2 className="text-2xl font-semibold mb-4">Reviews</h2>
           <div className="space-y-6 max-h-[calc(100vh-220px)] overflow-y-auto pr-2 pb-4">
-            {classData.reviews.map((review) => (
-              <ReviewCard key={review.id} review={review} />
-            ))}
+            {classData.reviews && classData.reviews.length > 0 ? (
+              classData.reviews.map((review, index) => (
+                <ReviewCard key={index} review={review} />
+              ))
+            ) : (
+              <p className="text-gray-500">
+                No reviews available for this course.
+              </p>
+            )}
           </div>
         </div>
       </div>

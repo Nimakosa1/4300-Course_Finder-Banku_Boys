@@ -1,124 +1,116 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import SearchBar from "@/components/SearchBar";
 import ClassCard from "@/components/ClassCard";
 import ReviewCard from "@/components/ReviewCard";
-import SimilarityGraph from "@/components/SimilarityGraph";
-
-// Mock data for search results with the updated schema
-const MOCK_CLASSES = [
-  {
-    id: 1,
-    classCode: "CS101",
-    title: "Introduction to Computer Science",
-    semester: ["Fall", "Spring"],
-    distribution: ["Science", "Technology"],
-    description:
-      "Introduction to computer science principles and programming fundamentals",
-  },
-  {
-    id: 2,
-    classCode: "MATH202",
-    title: "Calculus II",
-    semester: ["Spring"],
-    distribution: ["Mathematics", "QR"],
-    description:
-      "Advanced calculus concepts including integration techniques and applications",
-  },
-  {
-    id: 3,
-    classCode: "PHYS101",
-    title: "Physics I",
-    semester: ["Summer", "Fall"],
-    distribution: ["Science", "Laboratory"],
-    description:
-      "Basic physics principles covering mechanics, waves, and thermodynamics",
-  },
-  {
-    id: 4,
-    classCode: "PHYS101",
-    title: "Physics I",
-    semester: ["Summer", "Fall"],
-    distribution: ["Science", "Laboratory"],
-    description:
-      "Basic physics principles covering mechanics, waves, and thermodynamics",
-  },
-  {
-    id: 5,
-    classCode: "PHYS101",
-    title: "Physics I",
-    semester: ["Summer", "Fall"],
-    distribution: ["Science", "Laboratory"],
-    description:
-      "Basic physics principles covering mechanics, waves, and thermodynamics",
-  },
-  {
-    id: 6,
-    classCode: "PHYS101",
-    title: "Physics I",
-    semester: ["Summer", "Fall"],
-    distribution: ["Science", "Laboratory"],
-    description:
-      "Basic physics principles covering mechanics, waves, and thermodynamics",
-  },
-];
-
-// Mock data for reviews with the updated schema
-const MOCK_REVIEWS = [
-  {
-    id: 1,
-    reviewer: "Student123",
-    date: "1 day ago",
-    overall: 5,
-    difficulty: 3,
-    workload: 4,
-    reviewText:
-      "Great class with excellent materials. The professor explains concepts clearly.",
-    professor: "Dr. Smith",
-    likes: 10,
-    dislikes: 1,
-  },
-  {
-    id: 2,
-    reviewer: "GradStudent22",
-    date: "2 days ago",
-    overall: 4,
-    difficulty: 4,
-    workload: 5,
-    reviewText:
-      "Good class but could use more examples. Assignments are challenging but rewarding.",
-    professor: "Dr. Johnson",
-    likes: 8,
-    dislikes: 2,
-  },
-];
-
-// Mock data for filters
-const FILTERS = [
-  { id: "filter1", label: "Fall Semester" },
-  { id: "filter2", label: "Spring Semester" },
-  { id: "filter3", label: "Low Workload" },
-  { id: "filter4", label: "Science Distribution" },
-  { id: "filter5", label: "Humanities Distribution" },
-];
-
-// Mock data for similarity graph
-const KEYWORDS = [
-  "Programming",
-  "Mathematics",
-  "Theory",
-  "Practical",
-  "Projects",
-];
-const SIMILARITY = [80, 65, 90, 75, 85];
+import {
+  searchCourses,
+  filterCourses,
+  calculateAverageRatings,
+} from "@/lib/search-utils";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") || "";
+
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [debugInfo, setDebugInfo] = useState(null);
+  const [filters, setFilters] = useState({
+    semester: [],
+    classLevel: [],
+    difficulty: [],
+    workload: [],
+  });
+
+  // Perform search when query changes
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!query) return;
+
+      setLoading(true);
+      setError(null);
+      setDebugInfo(null);
+
+      try {
+        const results = await searchCourses(query, null);
+        console.log("Raw results:", results);
+
+        if (!results || !Array.isArray(results)) {
+          console.error("Invalid search results format:", results);
+          setError("Received invalid data format from the server");
+          setSearchResults([]);
+          return;
+        }
+
+        // Format the results to match our component structure
+        const formattedResults = results.map((course) => {
+          // Note the space in "course title" vs underscore in others
+          return {
+            id: course.course_code || "Unknown",
+            classCode: course.course_code || "Unknown",
+            title: course["course title"] || "No Title", // Note the space in property name
+            description: course.description || "",
+            semester: course.term_offered || [],
+            distribution: course.distributions || [],
+            reviews: course.reviews || [],
+            // Add calculated ratings
+            ...calculateAverageRatings(course.reviews || []),
+          };
+        });
+
+        console.log("Formatted results:", formattedResults.length);
+        setSearchResults(formattedResults);
+
+        // Set the first result as selected by default if available
+        if (formattedResults.length > 0 && !selectedCourse) {
+          setSelectedCourse(formattedResults[0]);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setError("Failed to fetch search results. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [query]);
+
+  // Handle filter changes
+  const handleFilterChange = (filterType, value) => {
+    setFilters((prevFilters) => {
+      const updatedFilters = { ...prevFilters };
+
+      if (updatedFilters[filterType].includes(value)) {
+        // Remove the filter if it's already selected
+        updatedFilters[filterType] = updatedFilters[filterType].filter(
+          (item) => item !== value
+        );
+      } else {
+        // Add the filter
+        updatedFilters[filterType] = [...updatedFilters[filterType], value];
+      }
+
+      return updatedFilters;
+    });
+  };
+
+  // Apply filters to search results
+  const filteredResults = filterCourses(searchResults, filters);
+
+  // Handle class selection
+  const handleClassSelect = (course) => {
+    setSelectedCourse(course);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -129,30 +121,183 @@ export default function SearchPage() {
       <div className="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6 mt-6">
         {/* Left column - Class List */}
         <div className="md:col-span-3">
-          <h2 className="text-xl font-semibold mb-4">Search Results</h2>
+          <h2 className="text-xl font-semibold mb-4">
+            Search Results ({filteredResults.length})
+          </h2>
+
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
+
+          {debugInfo && (
+            <div className="bg-yellow-50 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-4 text-xs">
+              <details>
+                <summary>API Debug Info (click to expand)</summary>
+                <div className="mt-2">
+                  {debugInfo.url && <p>URL: {debugInfo.url}</p>}
+                  {debugInfo.status && (
+                    <p>
+                      Status: {debugInfo.status} {debugInfo.statusText}
+                    </p>
+                  )}
+                  {debugInfo.error && <p>Error: {debugInfo.error}</p>}
+                  {debugInfo.responseText && (
+                    <div className="mt-2">
+                      <p>Response:</p>
+                      <pre className="bg-gray-100 p-2 mt-1 overflow-x-auto">
+                        {debugInfo.responseText}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </details>
+            </div>
+          )}
+
           <div className="space-y-6 max-h-[calc(100vh-180px)] overflow-y-auto pr-2 pb-4">
-            {MOCK_CLASSES.map((classItem) => (
-              <ClassCard key={classItem.id} classItem={classItem} />
-            ))}
+            {loading ? (
+              <p className="text-gray-500">Loading courses...</p>
+            ) : filteredResults.length > 0 ? (
+              filteredResults.map((classItem) => (
+                <div
+                  key={classItem.id}
+                  onClick={() => handleClassSelect(classItem)}
+                >
+                  <ClassCard
+                    classItem={{
+                      ...classItem,
+                      semester: classItem.semester || [],
+                    }}
+                    isSelected={
+                      selectedCourse && selectedCourse.id === classItem.id
+                    }
+                  />
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500">
+                {query
+                  ? `No results found for "${query}"`
+                  : "Enter a search query"}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Middle column - Graph and Reviews */}
+        {/* Middle column - Course Details & Reviews */}
         <div className="md:col-span-6">
           <div className="max-h-[calc(100vh-180px)] overflow-y-auto pr-2 pb-4">
-            <SimilarityGraph keywords={KEYWORDS} similarity={SIMILARITY} />
+            {selectedCourse ? (
+              <>
+                <Card className="mb-6">
+                  <CardContent className="p-6">
+                    <div className="mb-2 flex items-center">
+                      <span className="text-lg font-medium text-gray-500 mr-2">
+                        {selectedCourse.classCode}
+                      </span>
+                    </div>
+                    <h2 className="text-2xl font-bold mb-4">
+                      {selectedCourse.title}
+                    </h2>
+                    <p className="text-gray-700 mb-4">
+                      {selectedCourse.description}
+                    </p>
 
-            <h2 className="text-xl font-semibold my-4">Reviews</h2>
-            <div className="space-y-6">
-              {MOCK_REVIEWS.map((review) => (
-                <ReviewCard key={review.id} review={review} />
-              ))}
-            </div>
-            <div className="mt-6">
-              <button className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                See more about class
-              </button>
-            </div>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-500">
+                          Difficulty
+                        </span>
+                        <span className="font-semibold">
+                          {selectedCourse.avgDifficulty > 0
+                            ? selectedCourse.avgDifficulty.toFixed(1)
+                            : "N/A"}
+                          {selectedCourse.avgDifficulty > 0 ? "/5" : ""}
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-500">Workload</span>
+                        <span className="font-semibold">
+                          {selectedCourse.avgWorkload > 0
+                            ? selectedCourse.avgWorkload.toFixed(1)
+                            : "N/A"}
+                          {selectedCourse.avgWorkload > 0 ? "/5" : ""}
+                        </span>
+                      </div>
+                    </div>
+
+                    {selectedCourse.semester &&
+                      selectedCourse.semester.length > 0 && (
+                        <div className="mb-4">
+                          <span className="font-semibold">Terms Offered: </span>
+                          {selectedCourse.semester.join(", ")}
+                        </div>
+                      )}
+
+                    {selectedCourse.distribution &&
+                      selectedCourse.distribution.length > 0 && (
+                        <div className="mb-4">
+                          <span className="font-semibold">Distributions: </span>
+                          {selectedCourse.distribution.join(", ")}
+                        </div>
+                      )}
+                  </CardContent>
+                </Card>
+
+                <h2 className="text-xl font-semibold my-4">Reviews</h2>
+                <div className="space-y-6">
+                  {selectedCourse.reviews &&
+                  selectedCourse.reviews.length > 0 ? (
+                    selectedCourse.reviews
+                      .slice(0, 2)
+                      .map((review, index) => (
+                        <ReviewCard key={index} review={review} />
+                      ))
+                  ) : (
+                    <p className="text-gray-500">
+                      No reviews available for this course.
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-6">
+                  <Link
+                    href={{
+                      pathname: `/class/${selectedCourse.id.replace(
+                        /\s+/g,
+                        "-"
+                      )}`,
+                      query: {
+                        data: JSON.stringify({
+                          id: selectedCourse.id,
+                          classCode: selectedCourse.classCode,
+                          title: selectedCourse.title,
+                          description: selectedCourse.description,
+                          semester: selectedCourse.semester,
+                          distribution: selectedCourse.distribution,
+                          reviews: selectedCourse.reviews,
+                          avgDifficulty: selectedCourse.avgDifficulty,
+                          avgWorkload: selectedCourse.avgWorkload,
+                          avgOverall: selectedCourse.avgOverall,
+                        }),
+                      },
+                    }}
+                  >
+                    <Button className="w-full px-4 py-2 text-sm font-medium">
+                      See more about class
+                    </Button>
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-64">
+                <p className="text-gray-500">
+                  {loading ? "Loading..." : "Select a course to view details"}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -170,140 +315,52 @@ export default function SearchPage() {
                     Semester
                   </h3>
                   <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="fall" />
-                      <label
-                        htmlFor="fall"
-                        className="text-sm font-medium leading-none"
+                    {["Fall", "Spring", "Summer", "Winter"].map((semester) => (
+                      <div
+                        key={semester}
+                        className="flex items-center space-x-2"
                       >
-                        Fall
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="spring" />
-                      <label
-                        htmlFor="spring"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Spring
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="summer" />
-                      <label
-                        htmlFor="summer"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Summer
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="winter" />
-                      <label
-                        htmlFor="winter"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Winter
-                      </label>
-                    </div>
+                        <Checkbox
+                          id={semester.toLowerCase()}
+                          checked={filters.semester.includes(semester)}
+                          onCheckedChange={() =>
+                            handleFilterChange("semester", semester)
+                          }
+                        />
+                        <label
+                          htmlFor={semester.toLowerCase()}
+                          className="text-sm font-medium leading-none"
+                        >
+                          {semester}
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </div>
+
                 {/* Class Level Filters */}
                 <div>
                   <h3 className="text-sm font-semibold mb-2 text-gray-700">
                     Class Level
                   </h3>
                   <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="level1000" />
-                      <label
-                        htmlFor="level1000"
-                        className="text-sm font-medium leading-none"
-                      >
-                        1000
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="level2000" />
-                      <label
-                        htmlFor="level2000"
-                        className="text-sm font-medium leading-none"
-                      >
-                        2000
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="level3000" />
-                      <label
-                        htmlFor="level3000"
-                        className="text-sm font-medium leading-none"
-                      >
-                        3000
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="level4000" />
-                      <label
-                        htmlFor="level4000"
-                        className="text-sm font-medium leading-none"
-                      >
-                        4000
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="level5000" />
-                      <label
-                        htmlFor="level5000"
-                        className="text-sm font-medium leading-none"
-                      >
-                        5000+
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Distribution Filters */}
-                <div>
-                  <h3 className="text-sm font-semibold mb-2 text-gray-700">
-                    Distribution
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="science" />
-                      <label
-                        htmlFor="science"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Science
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="humanities" />
-                      <label
-                        htmlFor="humanities"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Humanities
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="socialScience" />
-                      <label
-                        htmlFor="socialScience"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Social Science
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="language" />
-                      <label
-                        htmlFor="language"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Language
-                      </label>
-                    </div>
+                    {["1000", "2000", "3000", "4000", "5000+"].map((level) => (
+                      <div key={level} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`level${level}`}
+                          checked={filters.classLevel.includes(level)}
+                          onCheckedChange={() =>
+                            handleFilterChange("classLevel", level)
+                          }
+                        />
+                        <label
+                          htmlFor={`level${level}`}
+                          className="text-sm font-medium leading-none"
+                        >
+                          {level}
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -313,33 +370,26 @@ export default function SearchPage() {
                     Difficulty
                   </h3>
                   <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="easy" />
-                      <label
-                        htmlFor="easy"
-                        className="text-sm font-medium leading-none"
+                    {["Easy", "Medium", "Hard"].map((difficulty) => (
+                      <div
+                        key={difficulty}
+                        className="flex items-center space-x-2"
                       >
-                        Easy (1-2)
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="medium" />
-                      <label
-                        htmlFor="medium"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Medium (3)
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="hard" />
-                      <label
-                        htmlFor="hard"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Hard (4-5)
-                      </label>
-                    </div>
+                        <Checkbox
+                          id={`difficulty-${difficulty.toLowerCase()}`}
+                          checked={filters.difficulty.includes(difficulty)}
+                          onCheckedChange={() =>
+                            handleFilterChange("difficulty", difficulty)
+                          }
+                        />
+                        <label
+                          htmlFor={`difficulty-${difficulty.toLowerCase()}`}
+                          className="text-sm font-medium leading-none"
+                        >
+                          {difficulty}
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -349,35 +399,44 @@ export default function SearchPage() {
                     Workload
                   </h3>
                   <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="light" />
-                      <label
-                        htmlFor="light"
-                        className="text-sm font-medium leading-none"
+                    {["Light", "Moderate", "Heavy"].map((workload) => (
+                      <div
+                        key={workload}
+                        className="flex items-center space-x-2"
                       >
-                        Light (1-2)
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="moderate" />
-                      <label
-                        htmlFor="moderate"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Moderate (3)
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="heavy" />
-                      <label
-                        htmlFor="heavy"
-                        className="text-sm font-medium leading-none"
-                      >
-                        Heavy (4-5)
-                      </label>
-                    </div>
+                        <Checkbox
+                          id={`workload-${workload.toLowerCase()}`}
+                          checked={filters.workload.includes(workload)}
+                          onCheckedChange={() =>
+                            handleFilterChange("workload", workload)
+                          }
+                        />
+                        <label
+                          htmlFor={`workload-${workload.toLowerCase()}`}
+                          className="text-sm font-medium leading-none"
+                        >
+                          {workload}
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </div>
+
+                {/* Clear Filters Button */}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() =>
+                    setFilters({
+                      semester: [],
+                      classLevel: [],
+                      difficulty: [],
+                      workload: [],
+                    })
+                  }
+                >
+                  Clear All Filters
+                </Button>
               </div>
             </CardContent>
           </Card>
