@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import json
 import os
 import sys
@@ -207,3 +205,5 @@ if __name__ == '__main__':
     else:
         print("Running in production mode...")
         deploy_app()
+
+
