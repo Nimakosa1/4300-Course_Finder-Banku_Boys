@@ -135,9 +135,14 @@ def search(query, index, idf, doc_norms, score_func=accumulate_dot_scores, token
 
     for id, numerator in dot_scores.items():
         denominator = q_norm * doc_norms[id]
-        if denominator:
+        # Make sure denominator is a scalar and not zero
+        if np.isscalar(denominator) and denominator > 0:
             score = numerator / denominator
             res.append((score, id))
-    res.sort(key = lambda x: -x[0])
+        elif isinstance(denominator, np.ndarray):
+        # If it's an array, check if it has a single value
+            if denominator.size == 1 and denominator.item() > 0:
+                score = numerator / denominator.item()
+                res.append((score, id))
 
     return res
