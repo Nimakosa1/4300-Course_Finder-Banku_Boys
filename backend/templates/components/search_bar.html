@@ -1,0 +1,28 @@
+{% macro render(initial_query='') %}
+<div class="bg-white shadow-sm p-4 sticky top-0 z-10">
+  <div class="max-w-7xl mx-auto flex items-center justify-between">
+    <a href="{{ url_for('index') }}" class="text-2xl font-bold">
+      CourseFinder
+    </a>
+    <form
+      action="{{ url_for('search_page') }}"
+      method="GET"
+      class="flex w-full max-w-xl"
+    >
+      <input
+        type="text"
+        name="q"
+        placeholder="Search for classes"
+        class="flex-grow rounded-l-md border border-gray-300 p-2"
+        value="{{ initial_query }}"
+      />
+      <button
+        type="submit"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-r-md"
+      >
+        Search
+      </button>
+    </form>
+  </div>
+</div>
+{% endmacro %}

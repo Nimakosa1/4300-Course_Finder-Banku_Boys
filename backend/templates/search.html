@@ -1,0 +1,776 @@
+{% extends "base.html" %} {% from "components/search_bar.html" import render as
+render_search_bar %} {% from "components/class_card.html" import render as
+render_class_card %} {% from "components/review_card.html" import render as
+render_review_card, render_stars %} {% block title %}Search Results -
+CourseFinder{% endblock %} {% block extra_head %}
+<style>
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+</style>
+{% endblock %} {% block content %}
+<!-- Search bar at the top -->
+{{ render_search_bar(query) }}
+
+<!-- Main content area -->
+<div class="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6 mt-6">
+  <!-- Left column - Class List -->
+  <div class="md:col-span-3">
+    <h2 class="text-xl font-semibold mb-4">
+      Search Results (<span id="results-count">0</span>)
+    </h2>
+
+    <div
+      id="error-message"
+      class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 hidden"
+    ></div>
+    <div
+      id="debug-info"
+      class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-4 text-xs hidden"
+    >
+      <details>
+        <summary>Debug Information</summary>
+        <div id="debug-content" class="mt-2"></div>
+      </details>
+    </div>
+
+    <div
+      id="search-results"
+      class="space-y-6 max-h-[calc(100vh-180px)] overflow-y-auto pr-2 pb-4"
+    >
+      <p id="loading-message" class="text-gray-500">Loading courses...</p>
+      <p id="no-results-message" class="text-gray-500 hidden">
+        {% if query %} No results found for "{{ query }}" {% else %} Enter a
+        search query {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- Middle column - Course Details & Reviews -->
+  <div class="md:col-span-6">
+    <div
+      id="course-details"
+      class="max-h-[calc(100vh-180px)] overflow-y-auto pr-2 pb-4"
+    >
+      <div class="flex items-center justify-center h-64">
+        <p class="text-gray-500" id="select-course-message">
+          Select a course to view details
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right column - Filters -->
+  <div class="md:col-span-3">
+    <div
+      class="border rounded-lg shadow-sm max-h-[calc(100vh-180px)] overflow-y-auto"
+    >
+      <div class="p-4 border-b">
+        <h2 class="text-lg font-semibold">Filters</h2>
+      </div>
+      <div class="p-4">
+        <div class="space-y-6">
+          <!-- Semester Filters -->
+          <div>
+            <h3 class="text-sm font-semibold mb-2 text-gray-700">Semester</h3>
+            <div class="space-y-2">
+              {% for semester in ['Fall', 'Spring', 'Summer', 'Winter'] %}
+              <div class="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="{{ semester.lower() }}"
+                  class="semester-filter"
+                  value="{{ semester }}"
+                />
+                <label
+                  for="{{ semester.lower() }}"
+                  class="text-sm font-medium leading-none"
+                >
+                  {{ semester }}
+                </label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Class Level Filters -->
+          <div>
+            <h3 class="text-sm font-semibold mb-2 text-gray-700">
+              Class Level
+            </h3>
+            <div class="space-y-2">
+              {% for level in ['1000', '2000', '3000', '4000', '5000+'] %}
+              <div class="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="level{{ level }}"
+                  class="level-filter"
+                  value="{{ level }}"
+                />
+                <label
+                  for="level{{ level }}"
+                  class="text-sm font-medium leading-none"
+                >
+                  {{ level }}
+                </label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Difficulty Filters -->
+          <div>
+            <h3 class="text-sm font-semibold mb-2 text-gray-700">Difficulty</h3>
+            <div class="space-y-2">
+              {% for difficulty in ['Easy', 'Medium', 'Hard'] %}
+              <div class="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="difficulty-{{ difficulty.lower() }}"
+                  class="difficulty-filter"
+                  value="{{ difficulty }}"
+                />
+                <label
+                  for="difficulty-{{ difficulty.lower() }}"
+                  class="text-sm font-medium leading-none"
+                >
+                  {{ difficulty }}
+                </label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Workload Filters -->
+          <div>
+            <h3 class="text-sm font-semibold mb-2 text-gray-700">Workload</h3>
+            <div class="space-y-2">
+              {% for workload in ['Light', 'Moderate', 'Heavy'] %}
+              <div class="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="workload-{{ workload.lower() }}"
+                  class="workload-filter"
+                  value="{{ workload }}"
+                />
+                <label
+                  for="workload-{{ workload.lower() }}"
+                  class="text-sm font-medium leading-none"
+                >
+                  {{ workload }}
+                </label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Clear Filters Button -->
+          <button
+            id="clear-filters"
+            class="w-full py-2 px-4 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50"
+          >
+            Clear All Filters
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Template for course details -->
+<template id="course-details-template">
+  <div class="border rounded-lg shadow-sm mb-6">
+    <div class="p-6">
+      <div class="mb-2 flex items-center">
+        <span
+          class="text-lg font-medium text-gray-500 mr-2"
+          id="template-class-code"
+        ></span>
+      </div>
+      <h2 class="text-2xl font-bold mb-4" id="template-title"></h2>
+      <p class="text-gray-700 mb-4" id="template-description"></p>
+
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div class="flex flex-col">
+          <span class="text-sm text-gray-500">Difficulty</span>
+          <span class="font-semibold" id="template-difficulty"></span>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-sm text-gray-500">Workload</span>
+          <span class="font-semibold" id="template-workload"></span>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <span class="font-semibold">Terms Offered: </span>
+        <span id="template-terms"></span>
+      </div>
+
+      <div class="mb-4">
+        <span class="font-semibold">Distributions: </span>
+        <span id="template-distributions"></span>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="text-xl font-semibold my-4">Reviews</h2>
+  <div id="template-reviews" class="space-y-6">
+    <!-- Reviews will be inserted here -->
+  </div>
+
+  <div class="mt-6">
+    <a
+      id="template-see-more-link"
+      href="#"
+      class="inline-block w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-center font-medium rounded-md"
+    >
+      See more about class
+    </a>
+  </div>
+</template>
+{% endblock %} {% block scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const query = "{{ query }}";
+    const searchResults = document.getElementById("search-results");
+    const loadingMessage = document.getElementById("loading-message");
+    const noResultsMessage = document.getElementById("no-results-message");
+    const resultsCount = document.getElementById("results-count");
+    const errorMessage = document.getElementById("error-message");
+    const debugInfo = document.getElementById("debug-info");
+    const debugContent = document.getElementById("debug-content");
+    const courseDetails = document.getElementById("course-details");
+    const selectCourseMessage = document.getElementById(
+      "select-course-message"
+    );
+    const courseDetailsTemplate = document.getElementById(
+      "course-details-template"
+    );
+    let allCourses = [];
+    let selectedCourse = null;
+
+    // Fetch search results
+    if (query) {
+      fetchSearchResults(query);
+    } else {
+      loadingMessage.classList.add("hidden");
+      noResultsMessage.classList.remove("hidden");
+    }
+
+    // Event listeners for filters
+    document
+      .querySelectorAll(
+        ".semester-filter, .level-filter, .difficulty-filter, .workload-filter"
+      )
+      .forEach((filter) => {
+        filter.addEventListener("change", applyFilters);
+      });
+
+    document
+      .getElementById("clear-filters")
+      .addEventListener("click", clearFilters);
+
+    // Functions
+    function fetchSearchResults(query) {
+      // Show loading state
+      loadingMessage.classList.remove("hidden");
+      noResultsMessage.classList.add("hidden");
+      errorMessage.classList.add("hidden");
+      debugInfo.classList.add("hidden");
+
+      // Clear previous search results
+      searchResults.innerHTML = "";
+      searchResults.appendChild(loadingMessage);
+
+      // Build API URL
+      const apiUrl = `/api/search?q=${encodeURIComponent(query)}`;
+
+      // Log for debugging
+      console.log("Fetching results from:", apiUrl);
+
+      fetch(apiUrl)
+        .then((response) => {
+          // Log response status for debugging
+          console.log("API response status:", response.status);
+
+          if (!response.ok) {
+            return response.text().then((text) => {
+              throw new Error(`API returned ${response.status}: ${text}`);
+            });
+          }
+          return response.json();
+        })
+        .then((data) => {
+          // Log data for debugging
+          console.log("API response data:", data);
+
+          loadingMessage.classList.add("hidden");
+          allCourses = data;
+
+          if (!data || data.length === 0) {
+            noResultsMessage.classList.remove("hidden");
+            resultsCount.textContent = "0";
+          } else {
+            resultsCount.textContent = data.length;
+            renderSearchResults(data);
+
+            // Select the first course by default
+            if (data.length > 0) {
+              selectCourse(data[0]);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching search results:", error);
+
+          // Hide loading message
+          loadingMessage.classList.add("hidden");
+
+          // Show error message
+          errorMessage.textContent = `Failed to fetch search results: ${error.message}`;
+          errorMessage.classList.remove("hidden");
+
+          // Show debug info
+          debugContent.innerHTML = `
+                        <p>Request URL: ${apiUrl}</p>
+                        <p>Error: ${error.message}</p>
+                        <p>Try these debugging steps:</p>
+                        <ol class="list-decimal ml-5">
+                            <li>Check that the Flask server is running</li>
+                            <li>Ensure the API endpoint is correctly configured</li>
+                            <li>Verify that CORS is properly configured</li>
+                        </ol>
+                    `;
+          debugInfo.classList.remove("hidden");
+        });
+    }
+
+    function renderSearchResults(courses) {
+      searchResults.innerHTML = "";
+
+      courses.forEach((course) => {
+        // Make sure we have all required properties
+        const courseData = {
+          course_code: course.course_code || "",
+          course_title: course["course title"] || course.title || "No Title",
+          description: course.description || "",
+          term_offered: course.term_offered || course.semester || [],
+          distributions: course.distributions || course.distribution || [],
+        };
+
+        const courseElement = document.createElement("div");
+        courseElement.innerHTML = `
+                    <div class="border rounded-lg transition-shadow cursor-pointer ${
+                      selectedCourse &&
+                      selectedCourse.course_code === courseData.course_code
+                        ? "border-blue-500 shadow-md"
+                        : "hover:shadow-md hover:border-blue-300"
+                    }" data-id="${courseData.course_code}">
+                        <div class="p-4">
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span class="text-sm font-medium text-gray-500">
+                                    ${courseData.course_code}
+                                </span>
+                                <div class="flex flex-wrap gap-1">
+                                    ${(courseData.term_offered || [])
+                                      .map((sem) => {
+                                        let colorClass =
+                                          "bg-gray-100 text-gray-800";
+                                        if (sem.trim() === "Fall")
+                                          colorClass =
+                                            "bg-amber-100 text-amber-800";
+                                        else if (sem.trim() === "Spring")
+                                          colorClass =
+                                            "bg-green-100 text-green-800";
+                                        else if (sem.trim() === "Summer")
+                                          colorClass =
+                                            "bg-blue-100 text-blue-800";
+                                        else if (sem.trim() === "Winter")
+                                          colorClass =
+                                            "bg-indigo-100 text-indigo-800";
+
+                                        return `<span class="text-xs px-2 py-0.5 rounded ${colorClass}">${sem.trim()}</span>`;
+                                      })
+                                      .join("")}
+                                </div>
+                            </div>
+                            <h3 class="font-semibold">${
+                              courseData.course_title
+                            }</h3>
+                            <p class="text-sm text-gray-600 mt-1 line-clamp-2">
+                                ${courseData.description || ""}
+                            </p>
+                            ${
+                              courseData.distributions &&
+                              courseData.distributions.length > 0
+                                ? `
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    ${courseData.distributions
+                                      .map(
+                                        (dist) => `
+                                        <span class="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">
+                                            ${dist}
+                                        </span>
+                                    `
+                                      )
+                                      .join("")}
+                                </div>
+                            `
+                                : ""
+                            }
+                        </div>
+                    </div>
+                `;
+
+        courseElement
+          .querySelector("[data-id]")
+          .addEventListener("click", () => selectCourse(course));
+        searchResults.appendChild(courseElement);
+      });
+    }
+
+    function selectCourse(course) {
+      selectedCourse = course;
+
+      // Update selected state in results list
+      document.querySelectorAll("[data-id]").forEach((element) => {
+        if (element.getAttribute("data-id") === course.course_code) {
+          element.classList.add("border-blue-500", "shadow-md");
+          element.classList.remove("hover:border-blue-300");
+        } else {
+          element.classList.remove("border-blue-500", "shadow-md");
+          element.classList.add("hover:border-blue-300");
+        }
+      });
+
+      // Hide the select course message
+      selectCourseMessage.classList.add("hidden");
+
+      // Render course details
+      renderCourseDetails(course);
+    }
+
+    function renderCourseDetails(course) {
+      // Clone the template
+      const template = courseDetailsTemplate.content.cloneNode(true);
+
+      // Make sure we have all required properties with fallbacks
+      const courseData = {
+        course_code: course.course_code || "",
+        title: course["course title"] || course.title || "No Title",
+        description: course.description || "No description available",
+        avgDifficulty: course.avgDifficulty || 0,
+        avgWorkload: course.avgWorkload || 0,
+        term_offered: course.term_offered || course.semester || [],
+        distributions: course.distributions || course.distribution || [],
+        reviews: course.reviews || [],
+      };
+
+      // Populate the template with course data
+      template.getElementById("template-class-code").textContent =
+        courseData.course_code;
+      template.getElementById("template-title").textContent = courseData.title;
+      template.getElementById("template-description").textContent =
+        courseData.description;
+
+      // Format difficulty
+      template.getElementById("template-difficulty").textContent =
+        courseData.avgDifficulty > 0
+          ? `${courseData.avgDifficulty.toFixed(1)}/5`
+          : "N/A";
+
+      // Format workload
+      template.getElementById("template-workload").textContent =
+        courseData.avgWorkload > 0
+          ? `${courseData.avgWorkload.toFixed(1)}/5`
+          : "N/A";
+
+      // Terms offered
+      template.getElementById("template-terms").textContent =
+        courseData.term_offered && courseData.term_offered.length > 0
+          ? courseData.term_offered.join(", ")
+          : "Not specified";
+
+      // Distributions
+      template.getElementById("template-distributions").textContent =
+        courseData.distributions && courseData.distributions.length > 0
+          ? courseData.distributions.join(", ")
+          : "None";
+
+      // Reviews
+      const reviewsContainer = template.getElementById("template-reviews");
+
+      if (courseData.reviews && courseData.reviews.length > 0) {
+        // Show only first two reviews in search page
+        courseData.reviews.slice(0, 2).forEach((review) => {
+          const reviewElement = document.createElement("div");
+          reviewElement.classList.add(
+            "border",
+            "rounded-lg",
+            "shadow-sm",
+            "mb-4"
+          );
+
+          let reviewContent = `<div class="p-4">`;
+
+          if (review.professor && review.professor !== "N/A") {
+            reviewContent += `
+                            <div class="mb-2">
+                                <div class="text-sm text-gray-600 font-medium">
+                                    Professor: ${review.professor}
+                                </div>
+                            </div>
+                        `;
+          }
+
+          if (review.major && review.major !== "N/A") {
+            reviewContent += `
+                            <div class="mb-2">
+                                <div class="text-sm text-gray-600">
+                                    Major: ${review.major}
+                                </div>
+                            </div>
+                        `;
+          }
+
+          if (review.grade && review.grade !== "N/A") {
+            reviewContent += `
+                            <div class="mb-2">
+                                <div class="text-sm text-gray-600">
+                                    Grade: ${review.grade}
+                                </div>
+                            </div>
+                        `;
+          }
+
+          reviewContent += `<div class="flex flex-wrap gap-4 mb-3">`;
+
+          if (review.overall && review.overall !== "-") {
+            reviewContent += `
+                            <div class="flex items-center">
+                                <span class="text-sm font-medium mr-2">Overall:</span>
+                                ${renderStars(parseInt(review.overall))}
+                            </div>
+                        `;
+          }
+
+          if (review.difficulty && review.difficulty !== "-") {
+            reviewContent += `
+                            <div class="flex items-center">
+                                <span class="text-sm font-medium mr-2">Difficulty:</span>
+                                ${renderStars(parseInt(review.difficulty))}
+                            </div>
+                        `;
+          }
+
+          if (review.workload && review.workload !== "-") {
+            reviewContent += `
+                            <div class="flex items-center">
+                                <span class="text-sm font-medium mr-2">Workload:</span>
+                                ${renderStars(parseInt(review.workload))}
+                            </div>
+                        `;
+          }
+
+          reviewContent += `</div>`;
+
+          if (review.comment) {
+            reviewContent += `<p class="text-gray-700 mb-3">${review.comment}</p>`;
+          }
+
+          reviewContent += `</div>`;
+          reviewElement.innerHTML = reviewContent;
+
+          reviewsContainer.appendChild(reviewElement);
+        });
+      } else {
+        const noReviewsElement = document.createElement("p");
+        noReviewsElement.className = "text-gray-500";
+        noReviewsElement.textContent = "No reviews available for this course.";
+        reviewsContainer.appendChild(noReviewsElement);
+      }
+
+      // Set the "See more" link
+      const seeMoreLink = template.getElementById("template-see-more-link");
+      const courseDataForLink = {
+        id: courseData.course_code,
+        classCode: courseData.course_code,
+        title: courseData.title,
+        description: courseData.description,
+        semester: courseData.term_offered,
+        distribution: courseData.distributions,
+        reviews: courseData.reviews,
+        avgDifficulty: courseData.avgDifficulty,
+        avgWorkload: courseData.avgWorkload,
+        avgOverall: course.avgOverall || 0,
+      };
+
+      // URL to the class details page
+      seeMoreLink.href = `/class/${courseData.course_code.replace(
+        /\s+/g,
+        "-"
+      )}?data=${encodeURIComponent(JSON.stringify(courseDataForLink))}`;
+
+      // Clear and append the new details
+      courseDetails.innerHTML = "";
+      courseDetails.appendChild(template);
+    }
+
+    function renderStars(rating, maxRating = 5) {
+      let stars = "";
+      const numRating = parseInt(rating) || 0;
+
+      for (let i = 0; i < maxRating; i++) {
+        const starColor = i < numRating ? "text-yellow-400" : "text-gray-300";
+        stars += `
+                    <svg class="w-5 h-5 ${starColor}" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                `;
+      }
+
+      return stars;
+    }
+
+    function applyFilters() {
+      const filters = {
+        semester: Array.from(
+          document.querySelectorAll(".semester-filter:checked")
+        ).map((el) => el.value),
+        classLevel: Array.from(
+          document.querySelectorAll(".level-filter:checked")
+        ).map((el) => el.value),
+        difficulty: Array.from(
+          document.querySelectorAll(".difficulty-filter:checked")
+        ).map((el) => el.value),
+        workload: Array.from(
+          document.querySelectorAll(".workload-filter:checked")
+        ).map((el) => el.value),
+      };
+
+      // Filter courses
+      const filteredCourses = filterCourses(allCourses, filters);
+
+      // Update results count
+      resultsCount.textContent = filteredCourses.length;
+
+      // Render filtered results
+      renderSearchResults(filteredCourses);
+
+      // If filtered results is empty, show no results message
+      if (filteredCourses.length === 0) {
+        noResultsMessage.classList.remove("hidden");
+      } else {
+        noResultsMessage.classList.add("hidden");
+
+        // Check if selected course is still in filtered results
+        const isSelectedCourseInResults =
+          selectedCourse &&
+          filteredCourses.some(
+            (course) => course.course_code === selectedCourse.course_code
+          );
+
+        if (!isSelectedCourseInResults && filteredCourses.length > 0) {
+          // Select the first course in filtered results
+          selectCourse(filteredCourses[0]);
+        }
+      }
+    }
+
+    function clearFilters() {
+      // Uncheck all filter checkboxes
+      document
+        .querySelectorAll(
+          ".semester-filter, .level-filter, .difficulty-filter, .workload-filter"
+        )
+        .forEach((checkbox) => {
+          checkbox.checked = false;
+        });
+
+      // Reapply filters (which will now show all results)
+      applyFilters();
+    }
+
+    function filterCourses(courses, filters) {
+      // If no filters are applied, return all courses
+      if (
+        !filters.semester.length &&
+        !filters.classLevel.length &&
+        !filters.difficulty.length &&
+        !filters.workload.length
+      ) {
+        return courses;
+      }
+
+      return courses.filter((course) => {
+        // Check semester filter
+        if (filters.semester.length > 0) {
+          const courseTerms = course.term_offered || course.semester || [];
+          const hasMatchingSemester = courseTerms.some((sem) =>
+            filters.semester.includes(sem.trim())
+          );
+
+          if (!hasMatchingSemester) return false;
+        }
+
+        // Check class level filter
+        if (filters.classLevel.length > 0) {
+          // Extract level from course code (e.g., "COMP 101" -> "1000")
+          const match = (course.course_code || "").match(/\d{3}/);
+          if (match) {
+            const courseLevel = match[0][0] + "000";
+
+            // Special case for 5000+
+            const levelToCheck =
+              parseInt(match[0][0]) >= 5 ? "5000+" : courseLevel;
+
+            if (!filters.classLevel.includes(levelToCheck)) {
+              return false;
+            }
+          } else {
+            return false;
+          }
+        }
+
+        // Check difficulty filter
+        if (filters.difficulty.length > 0) {
+          const avgDifficulty = course.avgDifficulty || 0;
+
+          const matchesDifficulty =
+            (filters.difficulty.includes("Easy") &&
+              avgDifficulty > 0 &&
+              avgDifficulty < 2.5) ||
+            (filters.difficulty.includes("Medium") &&
+              avgDifficulty >= 2.5 &&
+              avgDifficulty < 3.5) ||
+            (filters.difficulty.includes("Hard") && avgDifficulty >= 3.5);
+
+          if (!matchesDifficulty) return false;
+        }
+
+        // Check workload filter
+        if (filters.workload.length > 0) {
+          const avgWorkload = course.avgWorkload || 0;
+
+          const matchesWorkload =
+            (filters.workload.includes("Light") &&
+              avgWorkload > 0 &&
+              avgWorkload < 2.5) ||
+            (filters.workload.includes("Moderate") &&
+              avgWorkload >= 2.5 &&
+              avgWorkload < 3.5) ||
+            (filters.workload.includes("Heavy") && avgWorkload >= 3.5);
+
+          if (!matchesWorkload) return false;
+        }
+
+        // If passed all filters, include in results
+        return true;
+      });
+    }
+  });
+</script>
+{% endblock %}
