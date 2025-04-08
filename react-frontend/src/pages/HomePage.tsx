@@ -99,7 +99,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import CourseWheel from '@/components/CourseWheel';
+// import CourseWheel from '@/components/CourseWheel';
 import Robot from '@/components/Robot';
 
 function HomePage() {
@@ -151,9 +151,9 @@ function HomePage() {
           <Robot />
         </div>
         
-        <div className="absolute right-0 top-0 w-1/3 h-full">
+        {/* <div className="absolute right-0 top-0 w-1/3 h-full">
           <CourseWheel />
-        </div>
+        </div> */}
       </div>
     </div>
   );
