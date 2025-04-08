@@ -5,15 +5,15 @@ import { defineConfig } from "vite";
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: "/",
+  build: {
+    outDir: "static",
+    emptyOutDir: true,
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  build: {
-    outDir: "static",
-    emptyOutDir: true,
-  },
-  base: "/",
 });
