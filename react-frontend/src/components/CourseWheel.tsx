@@ -88,7 +88,7 @@ const CourseWheel: React.FC = () => {
           return prevIndex >= classes.length - 1 ? 0 : prevIndex + 1;
         });
       }
-    }, 1000);
+    }, 2000);
   };
 
   const toggleAutoScroll = () => {
