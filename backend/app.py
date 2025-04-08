@@ -286,9 +286,11 @@ def api_test():
 @app.route('/<path:path>')
 def serve_react_app(path=''):
     full_path = os.path.join(app.static_folder, path)
-    if path != "" and os.path.exists(full_path):
+
+    if path and os.path.isfile(full_path):
         return send_from_directory(app.static_folder, path)
     else:
+        index_path = os.path.join(app.static_folder, 'index.html')
         return send_from_directory(app.static_folder, 'index.html')
 
 
