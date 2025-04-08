@@ -282,25 +282,44 @@ def api_test():
     })
 
 
+# @app.route('/')
+# @app.route('/<path:path>')
+# def serve_react_app(path=''):
+#     full_path = os.path.join(app.static_folder, path)
+
+#     if path and os.path.isfile(full_path):
+#         return send_from_directory(app.static_folder, path)
+#     else:
+#         index_path = os.path.join(app.static_folder, 'index.html')
+#         return send_from_directory(app.static_folder, 'index.html')
+
+
 @app.route('/')
 @app.route('/<path:path>')
 def serve_react_app(path=''):
+    print(f"[ROUTE] Requested path: '{path}'")
     full_path = os.path.join(app.static_folder, path)
+    print(f"[ROUTE] Full path: {full_path}")
+    print(f"[ROUTE] Is file? {os.path.isfile(full_path)}")
 
-    if path and os.path.isfile(full_path):
-        return send_from_directory(app.static_folder, path)
-    else:
-        index_path = os.path.join(app.static_folder, 'index.html')
-        return send_from_directory(app.static_folder, 'index.html')
+    try:
+        if path and os.path.isfile(full_path):
+            print("[ROUTE] ✅ Serving:", path)
+            return send_from_directory(app.static_folder, path)
+        else:
+            print("[ROUTE] 🔁 Fallback to index.html")
+            return send_from_directory(app.static_folder, 'index.html')
+    except Exception as e:
+        print(f"[ROUTE] ❌ Error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 
-
-@app.errorhandler(404)
-def not_found(e):
-    if request.path.startswith('/api/'):
-        return jsonify({"error": "API endpoint not found"}), 404
-    return jsonify({"error": "Resource not found"}), 404
+# @app.errorhandler(404)
+# def not_found(e):
+#     if request.path.startswith('/api/'):
+#         return jsonify({"error": "API endpoint not found"}), 404
+#     return jsonify({"error": "Resource not found"}), 404
 
 
 
