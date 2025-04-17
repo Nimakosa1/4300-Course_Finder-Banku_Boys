@@ -4,6 +4,8 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_cors import CORS
 from nltk.tokenize import TreebankWordTokenizer
 import traceback
+from similarity import build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search
+import numpy as np
 
 # Initialize the tokenizer
 tokenizer = TreebankWordTokenizer()
@@ -11,12 +13,12 @@ tokenizer = TreebankWordTokenizer()
 # Function to safely load the search module after ensuring data is correctly loaded
 def load_search_module():
     try:
-        from similarity import build_inverted_index, compute_doc_norms, compute_idf, search
-        return (build_inverted_index, compute_doc_norms, compute_idf, search)
+        from similarity import build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search
+        return (build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search)
     except Exception as e:
         print(f"Error importing search functions: {e}")
         traceback.print_exc()
-        return (None, None, None, None)
+        return (None, None, None, None, None, None)
 
 # Get the directory of the current script
 current_directory = os.path.dirname(os.path.abspath(__file__))
@@ -74,7 +76,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'default-secret-key'
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Import search functions after data preparation
-(build_inverted_index, compute_doc_norms, compute_idf, search_function) = load_search_module()
+(build_inverted_index, compute_doc_norms, compute_idf, search_function, build_semantic_search, semantic_search) = load_search_module()
 
 # Initialize search variables
 inv_idx = {}
@@ -95,6 +97,19 @@ if build_inverted_index and compute_idf and compute_doc_norms and courses_list:
         traceback.print_exc()
 else:
     print("Search functions not properly loaded or no courses available. Search functionality will be limited.")
+
+# Initialize semantic search variables
+vectorizer = None
+svd = None
+X_reduced = None
+
+try:
+    print("Building semantic search index...")
+    vectorizer, svd, X_reduced = build_semantic_search(courses_list, tokenizer)
+    print("Successfully built semantic search index")
+except Exception as e:
+    print(f"Error building semantic search index: {str(e)}")
+    traceback.print_exc()
 
 # Helper function to calculate average ratings for a course
 def calculate_average_ratings(reviews):
@@ -198,32 +213,56 @@ def api_search():
         
         search_results = []
         
-        # Use vector space model search if available
-        if search_function and inv_idx and idf is not None and doc_norms is not None and len(doc_norms) > 0:
-            try:
-                search_results = search_function(query, inv_idx, idf, doc_norms)
-            except Exception as e:
-                print(f"Error in vector search: {e}")
-                traceback.print_exc()
-                # Fall back to simple search
-                search_results = simple_search(query, courses_list)
+        # Use semantic search if available
+        if vectorizer and svd and X_reduced is not None:
+            print("Using semantic search")
+            search_results = semantic_search(query, vectorizer, svd, X_reduced, courses_list, tokenizer, 20)
         else:
-            # Use simple search as fallback
-            print("Using simple search fallback")
-            search_results = simple_search(query, courses_list)
+            # Use vector space model search if available
+            if search_function and inv_idx and idf is not None and doc_norms is not None and len(doc_norms) > 0:
+                try:
+                    dot_scores, contributions = search_function(query, inv_idx, idf, doc_norms)
+                    search_results = dot_scores
+                except Exception as e:
+                    print(f"Error in vector search: {e}")
+                    traceback.print_exc()
+                    # Fall back to simple search
+                    search_results = simple_search(query, courses_list)
+            else:
+                # Use simple search as fallback
+                print("Using simple search fallback")
+                search_results = simple_search(query, courses_list)
         
         if not search_results:
             print("No search results found")
             return jsonify([])
             
-        # Get top results
-        top_results = search_results[:10]  # Get top 20 results
+        # Adjust scores based on number of reviews
+        def adjusted_score(score, course):
+            review_count = len(course.get("reviews", []))
+            return score * (1 + np.log1p(review_count))
+
+        rescored = []
+        for item in search_results:
+            score, idx = item[0], item[1]
+            if idx < len(courses_list):
+                course = courses_list[idx]
+                new_score = adjusted_score(score, course)
+                rescored.append((new_score, idx))
+
+        top_results = sorted(rescored, key=lambda x: -x[0])[:10]
         
         # Convert search results to course objects
         result = []
-        for score, idx in top_results:
+        seen_descriptions = set()
+        for item in top_results:
+            score, idx = item[0], item[1]
             if idx < len(courses_list):
-                result.append(courses_list[idx])
+                course = courses_list[idx]
+                description = course.get("description")
+                if description and description not in seen_descriptions:
+                    seen_descriptions.add(description)
+                    result.append(course)
             else:
                 print(f"Invalid index {idx} (out of range)")
         

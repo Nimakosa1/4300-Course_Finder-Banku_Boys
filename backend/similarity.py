@@ -1,6 +1,20 @@
 import numpy as np
-
 from nltk.tokenize import TreebankWordTokenizer
+from nltk.corpus import stopwords
+import string
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import TruncatedSVD
+from sklearn.metrics.pairwise import cosine_similarity
+import joblib
+import nltk
+
+try:
+    stop_words = set(stopwords.words('english'))
+except LookupError:
+    nltk.download('stopwords')
+    stop_words = set(stopwords.words('english'))
+
+punctuation = set(string.punctuation)
 
 # Initialize the tokenizer
 tokenizer = TreebankWordTokenizer()
@@ -21,12 +35,13 @@ def build_inverted_index(courses):
     """
     dic = {}
     for idx, doc in enumerate(courses):
-        token_set = set(doc['description_tokens'])
+        filtered_tokens = [t for t in doc['description_tokens'] if t.lower() not in stop_words and t not in punctuation]
+        token_set = set(filtered_tokens)
         for token in token_set:
             if token not in dic:
-                dic[token] = [(idx, doc['description_tokens'].count(token))]
+                dic[token] = [(idx, filtered_tokens.count(token))]
             else:
-                dic[token].append((idx, doc['description_tokens'].count(token)))
+                dic[token].append((idx, filtered_tokens.count(token)))
     return dic
 
 
@@ -77,30 +92,22 @@ def compute_doc_norms(index, idf, n_docs):
 
 
 def accumulate_dot_scores(query_word_counts, index, idf):
-    """
-    Calculates the dot product scores between a query and documents in an index.
+    doc_scores = {}
+    contributions = {}
 
-    Args:
-        query_word_counts (dict): A dictionary containing the word counts of the query.
-        index (dict): A dictionary containing the index of documents and their word counts.
-        idf (dict): A dictionary containing the inverse document frequency (idf) values for each word.
-
-    Returns:
-        dict: A dictionary containing the accumulated dot product scores for each document in the index.
-    """
-    dic = {}
     for word, count in query_word_counts.items():
         if word in index and word in idf:
             query_tf = count * idf[word]
-
-            for id, doc_tf in index[word]:
-                product = query_tf * (doc_tf * idf[word])
-
-                if id in dic:
-                    dic[id] += product
+            for doc_id, doc_tf in index[word]:
+                contribution = query_tf * (doc_tf * idf[word])
+                if doc_id in doc_scores:
+                    doc_scores[doc_id] += contribution
+                    contributions[doc_id].append((word, contribution))
                 else:
-                    dic[id] = product
-    return dic
+                    doc_scores[doc_id] = contribution
+                    contributions[doc_id] = [(word, contribution)]
+
+    return doc_scores, contributions
 
 
 def search(query, index, idf, doc_norms, score_func=accumulate_dot_scores, tokenizer=tokenizer):
@@ -120,6 +127,7 @@ def search(query, index, idf, doc_norms, score_func=accumulate_dot_scores, token
     """
     query = query.lower()
     query_token = tokenizer.tokenize(query)
+    query_token = [t for t in query_token if t.lower() not in stop_words and t not in punctuation]
 
     q_counts = {}
     for q in query_token:
@@ -129,7 +137,7 @@ def search(query, index, idf, doc_norms, score_func=accumulate_dot_scores, token
 
     q_norm = np.sqrt(sum(value ** 2 for value in q_tf_idf.values()))
 
-    dot_scores = score_func(q_counts, index, idf)
+    dot_scores, contributions = score_func(q_counts, index, idf)
 
     res = []
 
@@ -137,20 +145,34 @@ def search(query, index, idf, doc_norms, score_func=accumulate_dot_scores, token
         denominator = q_norm * doc_norms[id]
         if denominator:
             score = numerator / denominator
-            res.append((score, id))
+            res.append((score, id, sorted(contributions.get(id, []), key=lambda x: -x[1])[:5]))
+
     res.sort(key = lambda x: -x[0])
 
     return res
 
 
-# for id, numerator in dot_scores.items():
-#         denominator = q_norm * doc_norms[id]
-#         # Make sure denominator is a scalar and not zero
-#         if np.isscalar(denominator) and denominator > 0:
-#             score = numerator / denominator
-#             res.append((score, id))
-#         elif isinstance(denominator, np.ndarray):
-#         # If it's an array, check if it has a single value
-#             if denominator.size == 1 and denominator.item() > 0:
-#                 score = numerator / denominator.item()
-#                 res.append((score, id))
+def build_semantic_search(courses_list, tokenizer, n_components=100):
+    descriptions = [" ".join(course["description_tokens"]) for course in courses_list]
+
+    def custom_tokenizer(text):
+        tokens = tokenizer.tokenize(text.lower())
+        return [t for t in tokens if t not in stop_words and t not in punctuation]
+
+    vectorizer = TfidfVectorizer(tokenizer=custom_tokenizer)
+    X = vectorizer.fit_transform(descriptions)
+
+    svd = TruncatedSVD(n_components=n_components, random_state=42)
+    X_reduced = svd.fit_transform(X)
+
+    return vectorizer, svd, X_reduced
+
+def semantic_search(query, vectorizer, svd, X_reduced, courses_list, tokenizer, top_k=10):
+    query_vec = vectorizer.transform([query])
+    query_reduced = svd.transform(query_vec)
+
+    sims = cosine_similarity(query_reduced, X_reduced)[0]
+    top_indices = sims.argsort()[::-1][:top_k]
+
+    results = [(sims[idx], idx) for idx in top_indices]
+    return results
