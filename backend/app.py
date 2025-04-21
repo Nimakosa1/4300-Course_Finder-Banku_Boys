@@ -1,20 +1,23 @@
 import json
 import os
-from flask import Flask,request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from nltk.tokenize import TreebankWordTokenizer
 import traceback
+from similarity import build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search
+import numpy as np
 
 tokenizer = TreebankWordTokenizer()
 
+# We already imported these functions at the top of the file
 def load_search_module():
     try:
-        from similarity import build_inverted_index, compute_doc_norms, compute_idf, search
-        return (build_inverted_index, compute_doc_norms, compute_idf, search)
+        # Just return the already imported functions
+        return (build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search)
     except Exception as e:
-        print(f"Error importing search functions: {e}")
+        print(f"Error accessing search functions: {e}")
         traceback.print_exc()
-        return (None, None, None, None)
+        return (None, None, None, None, None, None)
 
 current_directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -57,11 +60,15 @@ except Exception as e:
     print(f"Error merging data: {str(e)}")
     courses_list = []
 
-STATIC_FOLDER = os.path.join(os.path.dirname(__file__), '..', 'react-frontend', 'static')
+STATIC_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'react-frontend', 'static'))
+print(f"Using static folder: {STATIC_FOLDER}")
+print(f"Static folder exists: {os.path.exists(STATIC_FOLDER)}")
+print(f"Files in static folder: {os.listdir(STATIC_FOLDER) if os.path.exists(STATIC_FOLDER) else 'folder not found'}")
 
-app = Flask(__name__, static_folder=STATIC_FOLDER, static_url_path='')
+app = Flask(__name__, 
+            static_folder=STATIC_FOLDER,
+            static_url_path='')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'default-secret-key'
-
 
 CORS(app, resources={
     r"/api/*": {
@@ -71,7 +78,7 @@ CORS(app, resources={
     }
 })
 
-(build_inverted_index, compute_doc_norms, compute_idf, search_function) = load_search_module()
+(build_inverted_index, compute_doc_norms, compute_idf, search_function, build_semantic_search, semantic_search) = load_search_module()
 
 inv_idx = {}
 idf = {}
@@ -90,6 +97,19 @@ if build_inverted_index and compute_idf and compute_doc_norms and courses_list:
         traceback.print_exc()
 else:
     print("Search functions not properly loaded or no courses available. Search functionality will be limited.")
+
+# Initialize semantic search variables
+vectorizer = None
+svd = None
+X_reduced = None
+
+try:
+    print("Building semantic search index...")
+    vectorizer, svd, X_reduced = build_semantic_search(courses_list, tokenizer)
+    print("Successfully built semantic search index")
+except Exception as e:
+    print(f"Error building semantic search index: {str(e)}")
+    traceback.print_exc()
 
 def calculate_average_ratings(reviews):
     if not reviews:
@@ -173,27 +193,54 @@ def api_search():
         
         search_results = []
         
-        if search_function and inv_idx and idf is not None and doc_norms is not None and len(doc_norms) > 0:
-            try:
-                search_results = search_function(query, inv_idx, idf, doc_norms)
-            except Exception as e:
-                print(f"Error in vector search: {e}")
-                traceback.print_exc()
-                search_results = simple_search(query, courses_list)
+        # Use semantic search if available
+        if vectorizer and svd and X_reduced is not None:
+            print("Using semantic search")
+            search_results = semantic_search(query, vectorizer, svd, X_reduced, courses_list, tokenizer, 20)
         else:
-            print("Using simple search fallback")
-            search_results = simple_search(query, courses_list)
+            # Use vector space model search if available
+            if search_function and inv_idx and idf is not None and doc_norms is not None and len(doc_norms) > 0:
+                try:
+                    search_results = search_function(query, inv_idx, idf, doc_norms)
+                except Exception as e:
+                    print(f"Error in vector search: {e}")
+                    traceback.print_exc()
+                    search_results = simple_search(query, courses_list)
+            else:
+                print("Using simple search fallback")
+                search_results = simple_search(query, courses_list)
         
         if not search_results:
             print("No search results found")
             return jsonify([])
-            
-        top_results = search_results[:10] 
         
-        result = []
-        for score, idx in top_results:
+        # Adjust scores based on number of reviews
+        def adjusted_score(score, course):
+            review_count = len(course.get("reviews", []))
+            return score * (1 + np.log1p(review_count))
+
+        rescored = []
+        for item in search_results:
+            score, idx = item[0], item[1]
             if idx < len(courses_list):
-                result.append(courses_list[idx])
+                course = courses_list[idx]
+                new_score = adjusted_score(score, course)
+                rescored.append((new_score, idx))
+
+        top_results = sorted(rescored, key=lambda x: -x[0])[:10]
+            
+        # Convert search results to course objects
+        result = []
+        seen_descriptions = set()
+        for item in top_results:
+            # Each item should be (score, idx)
+            score, idx = item
+            if idx < len(courses_list):
+                course = courses_list[idx]
+                description = course.get("description")
+                if description and description not in seen_descriptions:
+                    seen_descriptions.add(description)
+                    result.append(course)
             else:
                 print(f"Invalid index {idx} (out of range)")
         
@@ -250,7 +297,6 @@ def api_get_course(course_id):
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     
-# @app.route('/')
 @app.route("/api/get_courses", methods=["GET"])
 def api_get_courses():
     final_courses = []
@@ -266,8 +312,6 @@ def api_get_courses():
         "courses": final_courses,
         "keywords": []  
     }
-    # print(response)
-
 
     return jsonify(response)
 
@@ -281,66 +325,18 @@ def api_test():
         "index_size": len(inv_idx) if inv_idx else 0
     })
 
-
-# @app.route('/')
-# @app.route('/<path:path>')
-# def serve_react_app(path=''):
-#     full_path = os.path.join(app.static_folder, path)
-
-#     if path and os.path.isfile(full_path):
-#         return send_from_directory(app.static_folder, path)
-#     else:
-#         index_path = os.path.join(app.static_folder, 'index.html')
-#         return send_from_directory(app.static_folder, 'index.html')
-
-
-# @app.route('/')
-# @app.route('/<path:path>')
-# def serve_react_app(path=''):
-#     print(f"[ROUTE] Requested path: '{path}'")
-#     full_path = os.path.join(app.static_folder, path)
-#     print(f"[ROUTE] Full path: {full_path}")
-#     print(f"[ROUTE] Is file? {os.path.isfile(full_path)}")
-
-#     try:
-#         if path and os.path.isfile(full_path):
-#             print("[ROUTE] ✅ Serving:", path)
-#             return send_from_directory(app.static_folder, path)
-#         else:
-#             print("[ROUTE] 🔁 Fallback to index.html")
-#             return send_from_directory(app.static_folder, 'index.html')
-#     except Exception as e:
-#         print(f"[ROUTE] ❌ Error: {e}")
-#         return jsonify({"error": str(e)}), 500
-
-@app.route('/')
+@app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
-def serve_react_app(path=''):
-    print(f"[ROUTE] Requested path: '{path}'")
+def serve_react(path):
+    print(f"Requested path: {path}")
     
-    if path and os.path.exists(os.path.join(app.static_folder, path)):
-        print(f"[ROUTE] Serving static file: {path}")
+    # First try to serve as a static file
+    static_file_path = os.path.join(app.static_folder, path)
+    if path and os.path.isfile(static_file_path):
         return send_from_directory(app.static_folder, path)
     
-    print(f"[ROUTE] Serving index.html for path: {path}")
-    try:
-        return send_from_directory(app.static_folder, 'index.html')
-    except Exception as e:
-        print(f"[ROUTE] Error serving index.html: {e}")
-        index_path = os.path.join(app.static_folder, 'index.html')
-        if not os.path.exists(index_path):
-            print(f"[ROUTE] index.html not found at {index_path}")
-        return jsonify({"error": str(e)}), 500
-
-
-
-# @app.errorhandler(404)
-# def not_found(e):
-#     if request.path.startswith('/api/'):
-#         return jsonify({"error": "API endpoint not found"}), 404
-#     return jsonify({"error": "Resource not found"}), 404
-
-
+    # Otherwise return index.html for client-side routing
+    return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
     if os.path.exists('/etc/hostname') and '4300showcase.infosci.cornell.edu' in open('/etc/hostname').read():
