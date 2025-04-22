@@ -20,7 +20,6 @@ function renderStars(rating, maxRating = 5) {
   return stars;
 }
 
-// Add line-clamp utility if not supported natively
 document.addEventListener("DOMContentLoaded", function () {
   // Apply line-clamp to elements with the line-clamp-2 class
   const lineClampElements = document.querySelectorAll(".line-clamp-2");

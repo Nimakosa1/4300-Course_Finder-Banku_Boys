@@ -1,42 +1,56 @@
 {% extends "base.html" %} {% block title %}CourseFinder - Find Your Perfect
 Class{% endblock %} {% block content %}
-<div class="relative min-h-screen w-full">
-  <!-- Background Image -->
-  <!-- <div
-    class="absolute inset-0 bg-cover bg-center"
-    style="background-image: url('{{ url_for('static', filename='img/background-image.jpg') }}'); filter: brightness(0.7);"
-  ></div> -->
-
-  <!-- Content -->
+<div class="flex h-screen w-full overflow-hidden">
   <div
-    class="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 text-center"
+    class="w-1/2 bg-[#CACACA] flex flex-col items-center justify-center px-8"
   >
-    <h1 class="text-4xl md:text-6xl font-bold text-black mb-6">CourseFinder</h1>
+    <h1 class="text-5xl md:text-6xl font-bold text-black mb-6">CourseFinder</h1>
 
-    <div class="max-w-2xl w-full mb-8">
-      <p class="text-xl md:text-2xl text-black mb-8">
-        "I want a class that teaches coding but with minimal assignments"
+    <div class="w-full max-w-xl mb-8">
+      <p class="text-xl md:text-2xl text-black mb-8 text-center">
+        Find classes easily with natural language
       </p>
 
       <form
         action="{{ url_for('search_page') }}"
         method="GET"
-        class="flex w-full max-w-xl mx-auto"
+        class="flex w-full"
       >
         <input
           type="text"
           name="q"
           placeholder="Search for classes"
-          class="flex-grow bg-white/90 text-black text-lg placeholder:text-gray-500 rounded-l-lg focus:ring-2 focus:ring-blue-500 border-0 p-3"
+          class="flex-grow bg-white/90 text-black text-lg placeholder:text-gray-500 rounded-l-lg rounded-r-none border-0 p-3"
         />
         <button
           type="submit"
-          class="bg-black hover:bg-gray-800 text-white rounded-l-none rounded-r-lg px-6 text-lg"
+          class="bg-black hover:bg-gray-700 text-white rounded-l-none rounded-r-lg px-6 text-lg cursor-pointer"
         >
           Search
         </button>
       </form>
     </div>
   </div>
+
+  <div class="w-1/2 relative">
+    <!-- Spline Robot Component (positioned behind the wheel) -->
+    <div class="w-full h-full absolute inset-0 z-0">
+      <script
+        type="module"
+        src="https://unpkg.com/@splinetool/viewer@1.9.82/build/spline-viewer.js"
+      ></script>
+      <spline-viewer
+        url="https://prod.spline.design/Z8XuY8Nf4msNsbHi/scene.splinecode"
+      ></spline-viewer>
+    </div>
+
+    <!-- Course wheel component (positioned on top with higher z-index) -->
+    <div id="course-wheel" class="absolute right-0 top-0 w-1/3 h-full z-10">
+      <!-- Course wheel will be added via JavaScript -->
+    </div>
+  </div>
 </div>
+
+<!-- Include the course wheel JavaScript -->
+<script src="{{ url_for('static', filename='js/course_wheel.js') }}"></script>
 {% endblock %}

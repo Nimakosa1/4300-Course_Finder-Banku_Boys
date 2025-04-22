@@ -1,30 +1,33 @@
 {% macro render(class_item, is_selected=False) %}
 <div
   class="border rounded-lg transition-shadow cursor-pointer {% if is_selected %}border-blue-500 shadow-md{% else %}hover:shadow-md hover:border-blue-300{% endif %}"
-  data-class-id="{{ class_item.id }}"
+  data-id="{{ class_item.course_code }}"
 >
   <div class="p-4">
     <div class="flex items-center space-x-2 mb-1">
       <span class="text-sm font-medium text-gray-500">
-        {{ class_item.classCode }}
+        {{ class_item.course_code }}
       </span>
       <div class="flex flex-wrap gap-1">
-        {% for sem in class_item.semester %}
+        {% for sem in class_item.term_offered or class_item.semester or [] %}
         <span
-          class="text-xs px-2 py-0.5 rounded {% if sem.strip() == 'Fall' %}bg-amber-100 text-amber-800 {% elif sem.strip() == 'Spring' %}bg-green-100 text-green-800 {% elif sem.strip() == 'Summer' %}bg-blue-100 text-blue-800 {% elif sem.strip() == 'Winter' %}bg-indigo-100 text-indigo-800 {% else %}bg-gray-100 text-gray-800{% endif %}"
+          class="text-xs px-2 py-0.5 rounded {% if 'Fall' in sem %}bg-amber-100 text-amber-800{% elif 'Spring' in sem %}bg-green-100 text-green-800{% elif 'Summer' in sem %}bg-blue-100 text-blue-800{% elif 'Winter' in sem %}bg-indigo-100 text-indigo-800{% else %}bg-gray-100 text-gray-800{% endif %}"
         >
           {{ sem.strip() }}
         </span>
         {% endfor %}
       </div>
     </div>
-    <h3 class="font-semibold">{{ class_item.title }}</h3>
+    <h3 class="font-semibold">
+      {{ class_item['course title'] or class_item.title or 'No Title' }}
+    </h3>
     <p class="text-sm text-gray-600 mt-1 line-clamp-2">
-      {{ class_item.description }}
+      {{ class_item.description or '' }}
     </p>
-    {% if class_item.distribution and class_item.distribution|length > 0 %}
+    {% if (class_item.distribution or class_item.distributions) and
+    (class_item.distribution or class_item.distributions)|length > 0 %}
     <div class="mt-2 flex flex-wrap gap-1">
-      {% for dist in class_item.distribution %}
+      {% for dist in class_item.distribution or class_item.distributions %}
       <span class="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">
         {{ dist }}
       </span>
