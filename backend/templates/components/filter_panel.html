@@ -1,0 +1,144 @@
+{% macro render(filters) %}
+<div
+  class="border rounded-lg shadow-sm max-h-[calc(100vh-180px)] overflow-y-auto"
+>
+  <div class="p-4 border-b">
+    <h2 class="text-lg font-semibold">Filters</h2>
+  </div>
+  <div class="p-4">
+    <div class="space-y-6">
+      <!-- Semester Filters -->
+      <div>
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">Semester</h3>
+        <div class="space-y-2">
+          {% for semester in ['Fall', 'Spring', 'Summer', 'Winter'] %}
+          <div class="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="{{ semester.lower() }}"
+              class="semester-filter"
+              value="{{ semester }}"
+              {%
+              if
+              semester
+              in
+              filters.semester
+              %}checked{%
+              endif
+              %}
+            />
+            <label
+              for="{{ semester.lower() }}"
+              class="text-sm font-medium leading-none"
+            >
+              {{ semester }}
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Class Level Filters -->
+      <div>
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">Class Level</h3>
+        <div class="space-y-2">
+          {% for level in ['1000', '2000', '3000', '4000', '5000+'] %}
+          <div class="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="level{{ level }}"
+              class="level-filter"
+              value="{{ level }}"
+              {%
+              if
+              level
+              in
+              filters.classLevel
+              %}checked{%
+              endif
+              %}
+            />
+            <label
+              for="level{{ level }}"
+              class="text-sm font-medium leading-none"
+            >
+              {{ level }}
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Difficulty Filters -->
+      <div>
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">Difficulty</h3>
+        <div class="space-y-2">
+          {% for difficulty in ['Easy', 'Medium', 'Hard'] %}
+          <div class="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="difficulty-{{ difficulty.lower() }}"
+              class="difficulty-filter"
+              value="{{ difficulty }}"
+              {%
+              if
+              difficulty
+              in
+              filters.difficulty
+              %}checked{%
+              endif
+              %}
+            />
+            <label
+              for="difficulty-{{ difficulty.lower() }}"
+              class="text-sm font-medium leading-none"
+            >
+              {{ difficulty }}
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Workload Filters -->
+      <div>
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">Workload</h3>
+        <div class="space-y-2">
+          {% for workload in ['Light', 'Moderate', 'Heavy'] %}
+          <div class="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="workload-{{ workload.lower() }}"
+              class="workload-filter"
+              value="{{ workload }}"
+              {%
+              if
+              workload
+              in
+              filters.workload
+              %}checked{%
+              endif
+              %}
+            />
+            <label
+              for="workload-{{ workload.lower() }}"
+              class="text-sm font-medium leading-none"
+            >
+              {{ workload }}
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Clear Filters Button -->
+      <button
+        id="clear-filters"
+        class="w-full py-2 px-4 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50"
+      >
+        Clear All Filters
+      </button>
+    </div>
+  </div>
+</div>
+{% endmacro %}

@@ -1,8 +1,5 @@
-{% extends "base.html" %} {% from "components/search_bar.html" import render as
-render_search_bar %} {% from "components/class_card.html" import render as
-render_class_card %} {% from "components/review_card.html" import render as
-render_review_card, render_stars %} {% block title %}Search Results -
-CourseFinder{% endblock %} {% block extra_head %}
+{% extends "base.html" %} {% block title %}Search Results - CourseFinder{%
+endblock %} {% block extra_head %}
 <style>
   .line-clamp-2 {
     display: -webkit-box;
@@ -10,13 +7,62 @@ CourseFinder{% endblock %} {% block extra_head %}
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  #word-cloud-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 100;
+    background-color: #111111;
+  }
+
+  .hidden {
+    display: none !important;
+  }
 </style>
 {% endblock %} {% block content %}
+<!-- Word Cloud Loading Animation -->
+{% if query %}
+<div id="word-cloud-container">
+  <!-- WordCloud will be rendered here -->
+</div>
+{% endif %}
+
 <!-- Search bar at the top -->
-{{ render_search_bar(query) }}
+<div class="bg-white shadow-sm p-4 sticky top-0 z-10">
+  <div class="max-w-7xl mx-auto flex items-center justify-between">
+    <a href="{{ url_for('index') }}" class="text-2xl font-bold">
+      CourseFinder
+    </a>
+    <form
+      action="{{ url_for('search_page') }}"
+      method="GET"
+      class="flex w-full max-w-xl"
+    >
+      <input
+        type="text"
+        name="q"
+        placeholder="Search for classes"
+        class="flex-grow rounded-l-md border border-gray-300 p-2"
+        value="{{ query }}"
+      />
+      <button
+        type="submit"
+        class="bg-black hover:bg-gray-700 text-white px-4 py-2 rounded-r-md"
+      >
+        Search
+      </button>
+    </form>
+  </div>
+</div>
 
 <!-- Main content area -->
-<div class="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6 mt-6">
+<div
+  id="main-content"
+  class="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6 mt-6 {% if query %}hidden{% endif %}"
+>
   <!-- Left column - Class List -->
   <div class="md:col-span-3">
     <h2 class="text-xl font-semibold mb-4">
@@ -27,15 +73,6 @@ CourseFinder{% endblock %} {% block extra_head %}
       id="error-message"
       class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 hidden"
     ></div>
-    <div
-      id="debug-info"
-      class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-4 text-xs hidden"
-    >
-      <details>
-        <summary>Debug Information</summary>
-        <div id="debug-content" class="mt-2"></div>
-      </details>
-    </div>
 
     <div
       id="search-results"
@@ -55,10 +92,11 @@ CourseFinder{% endblock %} {% block extra_head %}
       id="course-details"
       class="max-h-[calc(100vh-180px)] overflow-y-auto pr-2 pb-4"
     >
-      <div class="flex items-center justify-center h-64">
-        <p class="text-gray-500" id="select-course-message">
-          Select a course to view details
-        </p>
+      <div
+        class="flex items-center justify-center h-64"
+        id="select-course-message"
+      >
+        <p class="text-gray-500">Select a course to view details</p>
       </div>
     </div>
   </div>
@@ -179,59 +217,11 @@ CourseFinder{% endblock %} {% block extra_head %}
     </div>
   </div>
 </div>
-
-<!-- Template for course details -->
-<template id="course-details-template">
-  <div class="border rounded-lg shadow-sm mb-6">
-    <div class="p-6">
-      <div class="mb-2 flex items-center">
-        <span
-          class="text-lg font-medium text-gray-500 mr-2"
-          id="template-class-code"
-        ></span>
-      </div>
-      <h2 class="text-2xl font-bold mb-4" id="template-title"></h2>
-      <p class="text-gray-700 mb-4" id="template-description"></p>
-
-      <div class="grid grid-cols-2 gap-4 mb-4">
-        <div class="flex flex-col">
-          <span class="text-sm text-gray-500">Difficulty</span>
-          <span class="font-semibold" id="template-difficulty"></span>
-        </div>
-        <div class="flex flex-col">
-          <span class="text-sm text-gray-500">Workload</span>
-          <span class="font-semibold" id="template-workload"></span>
-        </div>
-      </div>
-
-      <div class="mb-4">
-        <span class="font-semibold">Terms Offered: </span>
-        <span id="template-terms"></span>
-      </div>
-
-      <div class="mb-4">
-        <span class="font-semibold">Distributions: </span>
-        <span id="template-distributions"></span>
-      </div>
-    </div>
-  </div>
-
-  <h2 class="text-xl font-semibold my-4">Reviews</h2>
-  <div id="template-reviews" class="space-y-6">
-    <!-- Reviews will be inserted here -->
-  </div>
-
-  <div class="mt-6">
-    <a
-      id="template-see-more-link"
-      href="#"
-      class="inline-block w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-center font-medium rounded-md"
-    >
-      See more about class
-    </a>
-  </div>
-</template>
 {% endblock %} {% block scripts %}
+<!-- Load Word Cloud Script -->
+
+<script src="{{ url_for('static', filename='js/word_cloud.js') }}"></script>
+
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const query = "{{ query }}";
@@ -240,17 +230,32 @@ CourseFinder{% endblock %} {% block extra_head %}
     const noResultsMessage = document.getElementById("no-results-message");
     const resultsCount = document.getElementById("results-count");
     const errorMessage = document.getElementById("error-message");
-    const debugInfo = document.getElementById("debug-info");
-    const debugContent = document.getElementById("debug-content");
     const courseDetails = document.getElementById("course-details");
     const selectCourseMessage = document.getElementById(
       "select-course-message"
     );
-    const courseDetailsTemplate = document.getElementById(
-      "course-details-template"
-    );
+    const mainContent = document.getElementById("main-content");
+    const wordCloudContainer = document.getElementById("word-cloud-container");
+
     let allCourses = [];
     let selectedCourse = null;
+    let wordCloud = null;
+
+    // Initialize word cloud if query exists
+    if (query && wordCloudContainer) {
+      wordCloud = new WordCloud(wordCloudContainer);
+      wordCloud.setOnComplete(() => {
+        // Hide word cloud and show main content
+        wordCloudContainer.classList.add("hidden");
+        mainContent.classList.remove("hidden");
+      });
+    } else {
+      // If no query, hide word cloud and show content
+      if (wordCloudContainer) {
+        wordCloudContainer.classList.add("hidden");
+      }
+      mainContent.classList.remove("hidden");
+    }
 
     // Fetch search results
     if (query) {
@@ -279,7 +284,6 @@ CourseFinder{% endblock %} {% block extra_head %}
       loadingMessage.classList.remove("hidden");
       noResultsMessage.classList.add("hidden");
       errorMessage.classList.add("hidden");
-      debugInfo.classList.add("hidden");
 
       // Clear previous search results
       searchResults.innerHTML = "";
@@ -288,14 +292,8 @@ CourseFinder{% endblock %} {% block extra_head %}
       // Build API URL
       const apiUrl = `/api/search?q=${encodeURIComponent(query)}`;
 
-      // Log for debugging
-      console.log("Fetching results from:", apiUrl);
-
       fetch(apiUrl)
         .then((response) => {
-          // Log response status for debugging
-          console.log("API response status:", response.status);
-
           if (!response.ok) {
             return response.text().then((text) => {
               throw new Error(`API returned ${response.status}: ${text}`);
@@ -304,9 +302,6 @@ CourseFinder{% endblock %} {% block extra_head %}
           return response.json();
         })
         .then((data) => {
-          // Log data for debugging
-          console.log("API response data:", data);
-
           loadingMessage.classList.add("hidden");
           allCourses = data;
 
@@ -321,114 +316,101 @@ CourseFinder{% endblock %} {% block extra_head %}
             if (data.length > 0) {
               selectCourse(data[0]);
             }
+
+            // If we have keywords data, update the word cloud
+            if (data.keywords && wordCloud) {
+              wordCloud.words = data.keywords;
+              wordCloud.positionWords();
+            }
           }
         })
         .catch((error) => {
           console.error("Error fetching search results:", error);
-
-          // Hide loading message
           loadingMessage.classList.add("hidden");
-
-          // Show error message
           errorMessage.textContent = `Failed to fetch search results: ${error.message}`;
           errorMessage.classList.remove("hidden");
 
-          // Show debug info
-          debugContent.innerHTML = `
-                        <p>Request URL: ${apiUrl}</p>
-                        <p>Error: ${error.message}</p>
-                        <p>Try these debugging steps:</p>
-                        <ol class="list-decimal ml-5">
-                            <li>Check that the Flask server is running</li>
-                            <li>Ensure the API endpoint is correctly configured</li>
-                            <li>Verify that CORS is properly configured</li>
-                        </ol>
-                    `;
-          debugInfo.classList.remove("hidden");
+          // Hide word cloud on error
+          if (wordCloudContainer) {
+            wordCloudContainer.classList.add("hidden");
+          }
+          mainContent.classList.remove("hidden");
         });
     }
 
+    // Rest of your code remains the same
     function renderSearchResults(courses) {
       searchResults.innerHTML = "";
 
       courses.forEach((course) => {
-        // Make sure we have all required properties
-        const courseData = {
-          course_code: course.course_code || "",
-          course_title: course["course title"] || course.title || "No Title",
-          description: course.description || "",
-          term_offered: course.term_offered || course.semester || [],
-          distributions: course.distributions || course.distribution || [],
-        };
+        const classItem = document.createElement("div");
 
-        const courseElement = document.createElement("div");
-        courseElement.innerHTML = `
-                    <div class="border rounded-lg transition-shadow cursor-pointer ${
-                      selectedCourse &&
-                      selectedCourse.course_code === courseData.course_code
-                        ? "border-blue-500 shadow-md"
-                        : "hover:shadow-md hover:border-blue-300"
-                    }" data-id="${courseData.course_code}">
-                        <div class="p-4">
-                            <div class="flex items-center space-x-2 mb-1">
-                                <span class="text-sm font-medium text-gray-500">
-                                    ${courseData.course_code}
-                                </span>
-                                <div class="flex flex-wrap gap-1">
-                                    ${(courseData.term_offered || [])
-                                      .map((sem) => {
-                                        let colorClass =
-                                          "bg-gray-100 text-gray-800";
-                                        if (sem.trim() === "Fall")
-                                          colorClass =
-                                            "bg-amber-100 text-amber-800";
-                                        else if (sem.trim() === "Spring")
-                                          colorClass =
-                                            "bg-green-100 text-green-800";
-                                        else if (sem.trim() === "Summer")
-                                          colorClass =
-                                            "bg-blue-100 text-blue-800";
-                                        else if (sem.trim() === "Winter")
-                                          colorClass =
-                                            "bg-indigo-100 text-indigo-800";
+        // Determine selected state
+        const isSelected =
+          selectedCourse && selectedCourse.course_code === course.course_code;
+        const borderClass = isSelected
+          ? "border-blue-500 shadow-md"
+          : "hover:shadow-md hover:border-blue-300";
 
-                                        return `<span class="text-xs px-2 py-0.5 rounded ${colorClass}">${sem.trim()}</span>`;
-                                      })
-                                      .join("")}
-                                </div>
-                            </div>
-                            <h3 class="font-semibold">${
-                              courseData.course_title
-                            }</h3>
-                            <p class="text-sm text-gray-600 mt-1 line-clamp-2">
-                                ${courseData.description || ""}
-                            </p>
-                            ${
-                              courseData.distributions &&
-                              courseData.distributions.length > 0
-                                ? `
-                                <div class="mt-2 flex flex-wrap gap-1">
-                                    ${courseData.distributions
-                                      .map(
-                                        (dist) => `
-                                        <span class="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">
-                                            ${dist}
-                                        </span>
-                                    `
-                                      )
-                                      .join("")}
-                                </div>
-                            `
-                                : ""
-                            }
-                        </div>
-                    </div>
-                `;
+        // Format semesters
+        const semesterHtml = (course.term_offered || course.semester || [])
+          .map((sem) => {
+            let colorClass = "bg-gray-100 text-gray-800";
+            if (sem.trim() === "Fall")
+              colorClass = "bg-amber-100 text-amber-800";
+            else if (sem.trim() === "Spring")
+              colorClass = "bg-green-100 text-green-800";
+            else if (sem.trim() === "Summer")
+              colorClass = "bg-blue-100 text-blue-800";
+            else if (sem.trim() === "Winter")
+              colorClass = "bg-indigo-100 text-indigo-800";
 
-        courseElement
-          .querySelector("[data-id]")
-          .addEventListener("click", () => selectCourse(course));
-        searchResults.appendChild(courseElement);
+            return `<span class="text-xs px-2 py-0.5 rounded ${colorClass}">${sem.trim()}</span>`;
+          })
+          .join("");
+
+        // Format distributions
+        const distHtml =
+          (course.distribution || course.distributions || []).length > 0
+            ? `<div class="mt-2 flex flex-wrap gap-1">
+            ${(course.distribution || course.distributions || [])
+              .map(
+                (dist) =>
+                  `<span class="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">${dist}</span>`
+              )
+              .join("")}
+          </div>`
+            : "";
+
+        classItem.innerHTML = `
+          <div class="border rounded-lg transition-shadow cursor-pointer ${borderClass}" data-id="${
+          course.course_code
+        }">
+            <div class="p-4">
+              <div class="flex items-center space-x-2 mb-1">
+                <span class="text-sm font-medium text-gray-500">
+                  ${course.course_code}
+                </span>
+                <div class="flex flex-wrap gap-1">
+                  ${semesterHtml}
+                </div>
+              </div>
+              <h3 class="font-semibold">${
+                course["course title"] || course.title || "No Title"
+              }</h3>
+              <p class="text-sm text-gray-600 mt-1 line-clamp-2">
+                ${course.description || ""}
+              </p>
+              ${distHtml}
+            </div>
+          </div>
+        `;
+
+        classItem.querySelector("[data-id]").addEventListener("click", () => {
+          selectCourse(course);
+        });
+
+        searchResults.appendChild(classItem);
       });
     }
 
@@ -447,17 +429,17 @@ CourseFinder{% endblock %} {% block extra_head %}
       });
 
       // Hide the select course message
-      selectCourseMessage.classList.add("hidden");
+      if (selectCourseMessage) {
+        selectCourseMessage.style.display = "none";
+      }
 
       // Render course details
       renderCourseDetails(course);
     }
 
+    // The rest of the functions remain the same
     function renderCourseDetails(course) {
-      // Clone the template
-      const template = courseDetailsTemplate.content.cloneNode(true);
-
-      // Make sure we have all required properties with fallbacks
+      // Prepare course data
       const courseData = {
         course_code: course.course_code || "",
         title: course["course title"] || course.title || "No Title",
@@ -469,132 +451,145 @@ CourseFinder{% endblock %} {% block extra_head %}
         reviews: course.reviews || [],
       };
 
-      // Populate the template with course data
-      template.getElementById("template-class-code").textContent =
-        courseData.course_code;
-      template.getElementById("template-title").textContent = courseData.title;
-      template.getElementById("template-description").textContent =
-        courseData.description;
+      // Create the details HTML
+      let detailsHtml = `
+        <div class="border rounded-lg shadow-sm mb-6">
+          <div class="p-6">
+            <div class="mb-2 flex items-center">
+              <span class="text-lg font-medium text-gray-500 mr-2">
+                ${courseData.course_code}
+              </span>
+            </div>
+            <h2 class="text-2xl font-bold mb-4">${courseData.title}</h2>
+            <p class="text-gray-700 mb-4">${courseData.description}</p>
 
-      // Format difficulty
-      template.getElementById("template-difficulty").textContent =
-        courseData.avgDifficulty > 0
-          ? `${courseData.avgDifficulty.toFixed(1)}/5`
-          : "N/A";
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div class="flex flex-col">
+                <span class="text-sm text-gray-500">Difficulty</span>
+                <span class="font-semibold">
+                  ${
+                    courseData.avgDifficulty > 0
+                      ? `${courseData.avgDifficulty.toFixed(1)}/5`
+                      : "N/A"
+                  }
+                </span>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-sm text-gray-500">Workload</span>
+                <span class="font-semibold">
+                  ${
+                    courseData.avgWorkload > 0
+                      ? `${courseData.avgWorkload.toFixed(1)}/5`
+                      : "N/A"
+                  }
+                </span>
+              </div>
+            </div>
 
-      // Format workload
-      template.getElementById("template-workload").textContent =
-        courseData.avgWorkload > 0
-          ? `${courseData.avgWorkload.toFixed(1)}/5`
-          : "N/A";
+            <div class="mb-4">
+              <span class="font-semibold">Terms Offered: </span>
+              <span>${
+                courseData.term_offered.length > 0
+                  ? courseData.term_offered.join(", ")
+                  : "Not specified"
+              }</span>
+            </div>
 
-      // Terms offered
-      template.getElementById("template-terms").textContent =
-        courseData.term_offered && courseData.term_offered.length > 0
-          ? courseData.term_offered.join(", ")
-          : "Not specified";
+            <div class="mb-4">
+              <span class="font-semibold">Distributions: </span>
+              <span>${
+                courseData.distributions.length > 0
+                  ? courseData.distributions.join(", ")
+                  : "None"
+              }</span>
+            </div>
+          </div>
+        </div>
 
-      // Distributions
-      template.getElementById("template-distributions").textContent =
-        courseData.distributions && courseData.distributions.length > 0
-          ? courseData.distributions.join(", ")
-          : "None";
+        <h2 class="text-xl font-semibold my-4">Reviews</h2>
+        <div class="space-y-6">
+      `;
 
-      // Reviews
-      const reviewsContainer = template.getElementById("template-reviews");
-
+      // Add reviews (max 2)
       if (courseData.reviews && courseData.reviews.length > 0) {
-        // Show only first two reviews in search page
+        // Show only first two reviews
         courseData.reviews.slice(0, 2).forEach((review) => {
-          const reviewElement = document.createElement("div");
-          reviewElement.classList.add(
-            "border",
-            "rounded-lg",
-            "shadow-sm",
-            "mb-4"
-          );
-
-          let reviewContent = `<div class="p-4">`;
+          detailsHtml += `<div class="border rounded-lg shadow-sm mb-4"><div class="p-4">`;
 
           if (review.professor && review.professor !== "N/A") {
-            reviewContent += `
-                            <div class="mb-2">
-                                <div class="text-sm text-gray-600 font-medium">
-                                    Professor: ${review.professor}
-                                </div>
-                            </div>
-                        `;
+            detailsHtml += `
+              <div class="mb-2">
+                <div class="text-sm text-gray-600 font-medium">
+                  Professor: ${review.professor}
+                </div>
+              </div>
+            `;
           }
 
           if (review.major && review.major !== "N/A") {
-            reviewContent += `
-                            <div class="mb-2">
-                                <div class="text-sm text-gray-600">
-                                    Major: ${review.major}
-                                </div>
-                            </div>
-                        `;
+            detailsHtml += `
+              <div class="mb-2">
+                <div class="text-sm text-gray-600">
+                  Major: ${review.major}
+                </div>
+              </div>
+            `;
           }
 
           if (review.grade && review.grade !== "N/A") {
-            reviewContent += `
-                            <div class="mb-2">
-                                <div class="text-sm text-gray-600">
-                                    Grade: ${review.grade}
-                                </div>
-                            </div>
-                        `;
+            detailsHtml += `
+              <div class="mb-2">
+                <div class="text-sm text-gray-600">
+                  Grade: ${review.grade}
+                </div>
+              </div>
+            `;
           }
 
-          reviewContent += `<div class="flex flex-wrap gap-4 mb-3">`;
+          detailsHtml += `<div class="flex flex-wrap gap-4 mb-3">`;
 
           if (review.overall && review.overall !== "-") {
-            reviewContent += `
-                            <div class="flex items-center">
-                                <span class="text-sm font-medium mr-2">Overall:</span>
-                                ${renderStars(parseInt(review.overall))}
-                            </div>
-                        `;
+            detailsHtml += `
+              <div class="flex items-center">
+                <span class="text-sm font-medium mr-2">Overall:</span>
+                ${renderStarsClient(parseInt(review.overall))}
+              </div>
+            `;
           }
 
           if (review.difficulty && review.difficulty !== "-") {
-            reviewContent += `
-                            <div class="flex items-center">
-                                <span class="text-sm font-medium mr-2">Difficulty:</span>
-                                ${renderStars(parseInt(review.difficulty))}
-                            </div>
-                        `;
+            detailsHtml += `
+              <div class="flex items-center">
+                <span class="text-sm font-medium mr-2">Difficulty:</span>
+                ${renderStarsClient(parseInt(review.difficulty))}
+              </div>
+            `;
           }
 
           if (review.workload && review.workload !== "-") {
-            reviewContent += `
-                            <div class="flex items-center">
-                                <span class="text-sm font-medium mr-2">Workload:</span>
-                                ${renderStars(parseInt(review.workload))}
-                            </div>
-                        `;
+            detailsHtml += `
+              <div class="flex items-center">
+                <span class="text-sm font-medium mr-2">Workload:</span>
+                ${renderStarsClient(parseInt(review.workload))}
+              </div>
+            `;
           }
 
-          reviewContent += `</div>`;
+          detailsHtml += `</div>`;
 
           if (review.comment) {
-            reviewContent += `<p class="text-gray-700 mb-3">${review.comment}</p>`;
+            detailsHtml += `<p class="text-gray-700 mb-3">${review.comment}</p>`;
           }
 
-          reviewContent += `</div>`;
-          reviewElement.innerHTML = reviewContent;
-
-          reviewsContainer.appendChild(reviewElement);
+          detailsHtml += `</div></div>`;
         });
       } else {
-        const noReviewsElement = document.createElement("p");
-        noReviewsElement.className = "text-gray-500";
-        noReviewsElement.textContent = "No reviews available for this course.";
-        reviewsContainer.appendChild(noReviewsElement);
+        detailsHtml += `<p class="text-gray-500">No reviews available for this course.</p>`;
       }
 
-      // Set the "See more" link
-      const seeMoreLink = template.getElementById("template-see-more-link");
+      detailsHtml += `</div>`;
+
+      // Add "See more" button
       const courseDataForLink = {
         id: courseData.course_code,
         classCode: courseData.course_code,
@@ -608,28 +603,35 @@ CourseFinder{% endblock %} {% block extra_head %}
         avgOverall: course.avgOverall || 0,
       };
 
-      // URL to the class details page
-      seeMoreLink.href = `/class/${courseData.course_code.replace(
-        /\s+/g,
-        "-"
-      )}?data=${encodeURIComponent(JSON.stringify(courseDataForLink))}`;
+      detailsHtml += `
+        <div class="mt-6">
+          <a 
+            href="/class/${courseData.course_code.replace(
+              /\s+/g,
+              "-"
+            )}?data=${encodeURIComponent(JSON.stringify(courseDataForLink))}"
+            class="inline-block w-full px-4 py-2 bg-black hover:bg-gray-700 text-white text-center font-medium rounded-md"
+          >
+            See more about class
+          </a>
+        </div>
+      `;
 
-      // Clear and append the new details
-      courseDetails.innerHTML = "";
-      courseDetails.appendChild(template);
+      // Update the course details container
+      courseDetails.innerHTML = detailsHtml;
     }
 
-    function renderStars(rating, maxRating = 5) {
+    function renderStarsClient(rating, maxRating = 5) {
       let stars = "";
       const numRating = parseInt(rating) || 0;
 
       for (let i = 0; i < maxRating; i++) {
         const starColor = i < numRating ? "text-yellow-400" : "text-gray-300";
         stars += `
-                    <svg class="w-5 h-5 ${starColor}" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                `;
+          <svg class="w-5 h-5 ${starColor}" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+          </svg>
+        `;
       }
 
       return stars;

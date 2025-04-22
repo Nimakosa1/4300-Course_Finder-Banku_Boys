@@ -1,6 +1,6 @@
 import json
 import os
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory,render_template
 from flask_cors import CORS
 from nltk.tokenize import TreebankWordTokenizer
 import traceback
@@ -9,10 +9,8 @@ import numpy as np
 
 tokenizer = TreebankWordTokenizer()
 
-# We already imported these functions at the top of the file
 def load_search_module():
     try:
-        # Just return the already imported functions
         return (build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search)
     except Exception as e:
         print(f"Error accessing search functions: {e}")
@@ -61,18 +59,16 @@ except Exception as e:
     courses_list = []
 
 STATIC_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'react-frontend', 'static'))
-print(f"Using static folder: {STATIC_FOLDER}")
-print(f"Static folder exists: {os.path.exists(STATIC_FOLDER)}")
-print(f"Files in static folder: {os.listdir(STATIC_FOLDER) if os.path.exists(STATIC_FOLDER) else 'folder not found'}")
+
 
 app = Flask(__name__, 
-            static_folder=STATIC_FOLDER,
-            static_url_path='')
+            static_folder='static',
+            static_url_path='/static')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'default-secret-key'
 
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://127.0.0.1:5001", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://4300showcase.infosci.cornell.edu:5239" ],
+        "origins": ["http://localhost:5000","http://127.0.0.1:5001", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://4300showcase.infosci.cornell.edu:5239" ],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
@@ -325,18 +321,72 @@ def api_test():
         "index_size": len(inv_idx) if inv_idx else 0
     })
 
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve_react(path):
-    print(f"Requested path: {path}")
+# @app.route('/', defaults={'path': ''})
+# @app.route('/<path:path>')
+# def serve_react(path):
+#     print(f"Requested path: {path}")
     
-    # First try to serve as a static file
-    static_file_path = os.path.join(app.static_folder, path)
-    if path and os.path.isfile(static_file_path):
-        return send_from_directory(app.static_folder, path)
+#     # First try to serve as a static file
+#     static_file_path = os.path.join(app.static_folder, path)
+#     if path and os.path.isfile(static_file_path):
+#         return send_from_directory(app.static_folder, path)
     
-    # Otherwise return index.html for client-side routing
-    return send_from_directory(app.static_folder, 'index.html')
+#     # Otherwise return index.html for client-side routing
+#     return send_from_directory(app.static_folder, 'index.html')
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/search')
+def search_page():
+    query = request.args.get('q', '')
+    return render_template('search.html', query=query)
+
+@app.route('/class/<course_id>')
+def class_details(course_id):
+    try:
+        # Check if data was passed via URL parameter
+        data_param = request.args.get('data')
+        if data_param:
+            # Parse the JSON data
+            class_data = json.loads(data_param)
+        else:
+            # Otherwise get course data from API
+            original_course_id = course_id.replace('-', ' ')
+            
+            course_info = None
+            for course in courses_list:
+                if course.get("course_code") == original_course_id:
+                    course_info = course
+                    break
+            
+            if not course_info:
+                return render_template('class_details.html', error="Course not found", class_data=None)
+            
+            # Format the data for the template
+            ratings = calculate_average_ratings(course_info.get("reviews", []))
+            
+            class_data = {
+                'id': course_info.get('course_code'),
+                'classCode': course_info.get('course_code'),
+                'title': course_info.get('course title') or course_info.get('title') or 'No Title',
+                'description': course_info.get('description') or '',
+                'semester': course_info.get('term_offered') or [],
+                'distribution': course_info.get('distributions') or [],
+                'reviews': course_info.get('reviews') or [],
+                'avgDifficulty': ratings.get('avgDifficulty', 0),
+                'avgWorkload': ratings.get('avgWorkload', 0),
+                'avgOverall': ratings.get('avgOverall', 0),
+            }
+        
+        return render_template('class_details.html', class_data=class_data)
+    except Exception as e:
+        print(f"Error rendering class details: {str(e)}")
+        traceback.print_exc()
+        return render_template('class_details.html', error=f"Error loading course: {str(e)}", class_data=None)
+    
 
 if __name__ == '__main__':
     if os.path.exists('/etc/hostname') and '4300showcase.infosci.cornell.edu' in open('/etc/hostname').read():

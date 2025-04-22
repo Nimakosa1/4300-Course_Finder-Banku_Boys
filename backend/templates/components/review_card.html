@@ -1,5 +1,22 @@
-{% macro render(review) %} {% if review %}
-<div class="border rounded-lg shadow-sm mb-4">
+{% macro render_stars(rating, max_rating=5) %} {% set num_rating = 0 %} {% if
+rating is string %} {% if rating != '-' %} {% set num_rating = rating|int %} {%
+endif %} {% else %} {% set num_rating = rating|default(0) %} {% endif %}
+
+<div class="flex">
+  {% for i in range(max_rating) %}
+  <svg
+    class="w-5 h-5 {% if i < num_rating %}text-yellow-400{% else %}text-gray-300{% endif %}"
+    fill="currentColor"
+    viewBox="0 0 20 20"
+  >
+    <path
+      d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+    />
+  </svg>
+  {% endfor %}
+</div>
+{% endmacro %} {% macro render(review) %} {% if review %}
+<div class="border rounded-lg shadow-md mb-4">
   <div class="p-4">
     {% if review.professor and review.professor != 'N/A' %}
     <div class="mb-2">
@@ -21,17 +38,17 @@
       {% if review.overall and review.overall != '-' %}
       <div class="flex items-center">
         <span class="text-sm font-medium mr-2">Overall:</span>
-        {{ render_stars(review.overall)|safe }}
+        {{ render_stars(review.overall) }}
       </div>
       {% endif %} {% if review.difficulty and review.difficulty != '-' %}
       <div class="flex items-center">
         <span class="text-sm font-medium mr-2">Difficulty:</span>
-        {{ render_stars(review.difficulty)|safe }}
+        {{ render_stars(review.difficulty) }}
       </div>
       {% endif %} {% if review.workload and review.workload != '-' %}
       <div class="flex items-center">
         <span class="text-sm font-medium mr-2">Workload:</span>
-        {{ render_stars(review.workload)|safe }}
+        {{ render_stars(review.workload) }}
       </div>
       {% endif %}
     </div>
@@ -41,22 +58,4 @@
     {% endif %}
   </div>
 </div>
-{% endif %} {% endmacro %} {% macro render_stars(rating, max_rating=5) %} {% set
-num_rating = 0 %} {% if rating is string %} {% if rating != '-' %} {% set
-num_rating = rating|int %} {% endif %} {% else %} {% set num_rating =
-rating|default(0) %} {% endif %}
-
-<div class="flex">
-  {% for i in range(max_rating) %}
-  <svg
-    class="w-5 h-5 {% if i < num_rating %}text-yellow-400{% else %}text-gray-300{% endif %}"
-    fill="currentColor"
-    viewBox="0 0 20 20"
-  >
-    <path
-      d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-    />
-  </svg>
-  {% endfor %}
-</div>
-{% endmacro %}
+{% endif %} {% endmacro %}
