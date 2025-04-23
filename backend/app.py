@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify, send_from_directory,render_template
 from flask_cors import CORS
 from nltk.tokenize import TreebankWordTokenizer
 import traceback
-from similarity import build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search
+from similarity import build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search, stop_words, punctuation
 import numpy as np
 from sentence_transformers import SentenceTransformer
 import joblib
@@ -29,6 +29,7 @@ reviews_path = os.path.join(current_directory, 'course_reviews.json')
 try:
     print("Loading BERT embeddings...")
     course_codes, bert_embeddings = joblib.load("bert_embeddings.joblib")
+    title_course_codes, title_embeddings = joblib.load("bert_title_embeddings.joblib")
     bert_model = SentenceTransformer("all-MiniLM-L6-v2")
     print("Successfully loaded BERT embeddings")
 except Exception as e:
@@ -155,6 +156,33 @@ def compute_keyword_scores(query, inv_idx, idf, doc_norms, tokenizer, stop_words
 
     return doc_score_lookup
 
+# SVD topic matching words function
+def get_svd_matching_words(query, course_description, vectorizer, svd, tokenizer, top_n_topics=3, top_n_words=10):
+    if not vectorizer or not svd:
+        return []
+
+    query_vec = vectorizer.transform([query])
+    query_reduced = svd.transform(query_vec)[0]
+    top_topic_indices = query_reduced.argsort()[::-1][:top_n_topics]
+
+    terms = vectorizer.get_feature_names_out()
+    components = svd.components_
+
+    top_topic_words = set()
+    for topic_idx in top_topic_indices:
+        word_weights = components[topic_idx]
+        top_indices = word_weights.argsort()[::-1][:top_n_words]
+        for i in top_indices:
+            top_topic_words.add(terms[i])
+
+    # Tokenize course description
+    course_tokens = tokenizer.tokenize(course_description.lower())
+    filtered_tokens = [t for t in course_tokens if t not in stop_words and t not in punctuation]
+
+    # Match topic words in the course description
+    matched_words = [word for word in filtered_tokens if word in top_topic_words]
+    return list(set(matched_words))
+
 def calculate_average_ratings(reviews):
     if not reviews:
         return {
@@ -205,6 +233,11 @@ def bert_search(query, top_k=10):
     results = [(similarities[i], i) for i in top_indices]
     return results
 
+def get_bert_title_similarity_scores(query, top_k=10):
+    query_vec = bert_model.encode([query])
+    sims = cosine_similarity(query_vec, title_embeddings)[0]
+    score_map = {code: sim for code, sim in zip(title_course_codes, sims)}
+    return score_map
 
 def simple_search(query, courses):
     """Fallback search function that uses basic string matching"""
@@ -271,6 +304,7 @@ def api_search():
                # Compute keyword search results and scores for top results
         keyword_search_results = search_function(query, inv_idx, idf, doc_norms)
         keyword_score_map = {idx: round(score * 100, 0) for score, idx, *_ in keyword_search_results}
+        title_score_map = get_bert_title_similarity_scores(query)
             
         if not search_results:
             print("No search results found")
@@ -321,10 +355,26 @@ def api_search():
                 ratings = calculate_average_ratings(course_copy.get("reviews", []))
                 course_copy.update(ratings)
                 course_code = course_copy.get("course_code")
+                
                 course_copy["sentiment_score"] = scaled_sentiments.get(course_code, 50)
+                
                 course_copy["BERT_similarity_score"] = round(similarity_score * 100, 0)
+                
                 idx = next((i for i, c in enumerate(courses_list) if c.get("course_code") == course_copy.get("course_code")), None)
                 course_copy["keyword_score"] = keyword_score_map.get(idx, 0)
+                
+                raw_score = title_score_map.get(course_code, 0)
+                course_copy["BERT_title_similarity_score"] = round(raw_score * 100, 0)
+
+                # Add SVD topic words matching
+                course_copy["svd_top_words"] = get_svd_matching_words(
+                    query,
+                    course_copy.get("description", ""),
+                    vectorizer,
+                    svd,
+                    tokenizer
+                )
+                
                 formatted_results.append(course_copy)
             except Exception as e:
                 print(f"Error formatting course: {e}")
