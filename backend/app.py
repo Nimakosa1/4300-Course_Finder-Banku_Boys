@@ -268,8 +268,9 @@ def api_search():
                 print("Using simple search fallback")
                 search_results = simple_search(query, courses_list)
         
-        if search_function and inv_idx and idf is not None and doc_norms is not None and len(doc_norms) > 0:
-            keyword_search_results = search_function(query, inv_idx, idf, doc_norms)
+               # Compute keyword search results and scores for top results
+        keyword_search_results = search_function(query, inv_idx, idf, doc_norms)
+        keyword_score_map = {idx: round(score * 100, 0) for score, idx, *_ in keyword_search_results}
             
         if not search_results:
             print("No search results found")
@@ -322,6 +323,8 @@ def api_search():
                 course_code = course_copy.get("course_code")
                 course_copy["sentiment_score"] = scaled_sentiments.get(course_code, 50)
                 course_copy["BERT_similarity_score"] = round(similarity_score * 100, 0)
+                idx = next((i for i, c in enumerate(courses_list) if c.get("course_code") == course_copy.get("course_code")), None)
+                course_copy["keyword_score"] = keyword_score_map.get(idx, 0)
                 formatted_results.append(course_copy)
             except Exception as e:
                 print(f"Error formatting course: {e}")
