@@ -157,7 +157,7 @@ def compute_keyword_scores(query, inv_idx, idf, doc_norms, tokenizer, stop_words
     return doc_score_lookup
 
 # SVD topic matching words function
-def get_svd_matching_words(query, course_description, vectorizer, svd, tokenizer, top_n_topics=3, top_n_words=10):
+def get_svd_matching_words(query, course_description, vectorizer, svd, tokenizer, top_n_topics=5, top_n_words=10):
     if not vectorizer or not svd:
         return []
 
