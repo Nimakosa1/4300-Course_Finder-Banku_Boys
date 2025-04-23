@@ -28,3 +28,5 @@ nltk==3.8.1
 scikit-learn>=1.0.0
 joblib>=1.2.0
 sentence-transformers>=2.2.2
+transformers>=4.36.2
+torch>=2.0.0
