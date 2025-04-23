@@ -6,6 +6,9 @@ from nltk.tokenize import TreebankWordTokenizer
 import traceback
 from similarity import build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search
 import numpy as np
+from sentence_transformers import SentenceTransformer
+import joblib
+from sklearn.metrics.pairwise import cosine_similarity
 
 tokenizer = TreebankWordTokenizer()
 
@@ -21,6 +24,17 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 
 courses_path = os.path.join(current_directory, 'courses_w_tokens.json')
 reviews_path = os.path.join(current_directory, 'course_reviews.json')
+
+try:
+    print("Loading BERT embeddings...")
+    course_codes, bert_embeddings = joblib.load("bert_embeddings.joblib")
+    bert_model = SentenceTransformer("all-MiniLM-L6-v2")
+    print("Successfully loaded BERT embeddings")
+except Exception as e:
+    print("Error loading BERT embeddings:", e)
+    bert_embeddings = None
+    course_codes = []
+    bert_model = None
 
 try:
     with open(courses_path, 'r') as file:
@@ -150,6 +164,14 @@ def calculate_average_ratings(reviews):
         'avgOverall': overall_sum / overall_count if overall_count > 0 else 0
     }
 
+def bert_search(query, top_k=10):
+    query_embedding = bert_model.encode([query])
+    similarities = cosine_similarity(query_embedding, bert_embeddings)[0]
+    top_indices = similarities.argsort()[::-1][:top_k]
+    results = [(similarities[i], i) for i in top_indices]
+    return results
+
+
 def simple_search(query, courses):
     """Fallback search function that uses basic string matching"""
     query = query.lower()
@@ -190,9 +212,12 @@ def api_search():
         search_results = []
         
         # Use semantic search if available
-        if vectorizer and svd and X_reduced is not None:
-            print("Using semantic search")
-            search_results = semantic_search(query, vectorizer, svd, X_reduced, courses_list, tokenizer, 20)
+        # if vectorizer and svd and X_reduced is not None:
+        #     print("Using semantic search")
+        #     search_results = semantic_search(query, vectorizer, svd, X_reduced, courses_list, tokenizer, 20)
+        if bert_model and bert_embeddings is not None:
+            print("Using BERT semantic search")
+            search_results = bert_search(query, 20)
         else:
             # Use vector space model search if available
             if search_function and inv_idx and idf is not None and doc_norms is not None and len(doc_norms) > 0:
