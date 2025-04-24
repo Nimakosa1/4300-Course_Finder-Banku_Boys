@@ -38,7 +38,6 @@ except Exception as e:
     course_codes = []
     bert_model = None
     
-#Get course sentiments   
 course_sentiments = load_course_sentiments()
 
 try:
@@ -120,7 +119,6 @@ if build_inverted_index and compute_idf and compute_doc_norms and courses_list:
 else:
     print("Search functions not properly loaded or no courses available. Search functionality will be limited.")
 
-# Initialize semantic search variables
 vectorizer = None
 svd = None
 X_reduced = None
@@ -156,7 +154,6 @@ def compute_keyword_scores(query, inv_idx, idf, doc_norms, tokenizer, stop_words
 
     return doc_score_lookup
 
-# SVD topic matching words function
 def get_svd_matching_words(query, course_description, vectorizer, svd, tokenizer, top_n_topics=5, top_n_words=10):
     if not vectorizer or not svd:
         return []
@@ -175,11 +172,9 @@ def get_svd_matching_words(query, course_description, vectorizer, svd, tokenizer
         for i in top_indices:
             top_topic_words.add(terms[i])
 
-    # Tokenize course description
     course_tokens = tokenizer.tokenize(course_description.lower())
     filtered_tokens = [t for t in course_tokens if t not in stop_words and t not in punctuation]
 
-    # Match topic words in the course description
     matched_words = [word for word in filtered_tokens if word in top_topic_words]
     return list(set(matched_words))
 
@@ -278,18 +273,13 @@ def api_search():
         
         search_results = []
         
-        #Get query sentiment
         query_sentiment = get_query_sentiment(query)
         
-        # Use semantic search if available
-        # if vectorizer and svd and X_reduced is not None:
-        #     print("Using semantic search")
-        #     search_results = semantic_search(query, vectorizer, svd, X_reduced, courses_list, tokenizer, 20)
+      
         if bert_model and bert_embeddings is not None:
             print("Using BERT semantic search")
             search_results = bert_search(query, 20)
         else:
-            # Use vector space model search if available
             if search_function and inv_idx and idf is not None and doc_norms is not None and len(doc_norms) > 0:
                 try:
                     search_results = search_function(query, inv_idx, idf, doc_norms)
@@ -301,7 +291,6 @@ def api_search():
                 print("Using simple search fallback")
                 search_results = simple_search(query, courses_list)
         
-               # Compute keyword search results and scores for top results
         keyword_search_results = search_function(query, inv_idx, idf, doc_norms)
         keyword_score_map = {idx: round(score * 100, 0) for score, idx, *_ in keyword_search_results}
         title_score_map = get_bert_title_similarity_scores(query)
@@ -310,29 +299,18 @@ def api_search():
             print("No search results found")
             return jsonify([])
         
-        # Adjust scores based on number of reviews
         def adjusted_score(score, course):
             review_count = len(course.get("reviews", []))
             return score * (1 + np.log1p(review_count))
 
-        ##### <------Deprecated------>
-        # rescored = []
-        # for item in search_results:
-        #     score, idx = item[0], item[1]
-        #     if idx < len(courses_list):
-        #         course = courses_list[idx]
-        #         new_score = adjusted_score(score, course)
-        #         rescored.append((new_score, idx))
+      
         
-        # Readjust scores using sentiment from queries
         rescored = adjust_bert_scores_with_sentiment(query_sentiment, course_sentiments, search_results, course_codes, alpha=0.3)
         top_results = sorted(rescored, key=lambda x: -x[0])[:10]
             
-        # Convert search results to course objects
         result = []
         seen_descriptions = set()
         for item in top_results:
-            # Each item should be (score, idx)
             score, idx = item
             if idx < len(courses_list):
                 course = courses_list[idx]
@@ -366,7 +344,6 @@ def api_search():
                 raw_score = title_score_map.get(course_code, 0)
                 course_copy["BERT_title_similarity_score"] = round(raw_score * 100, 0)
 
-                # Add SVD topic words matching
                 course_copy["svd_top_words"] = get_svd_matching_words(
                     query,
                     course_copy.get("description", ""),
@@ -444,19 +421,6 @@ def api_test():
         "index_size": len(inv_idx) if inv_idx else 0
     })
 
-# @app.route('/', defaults={'path': ''})
-# @app.route('/<path:path>')
-# def serve_react(path):
-#     print(f"Requested path: {path}")
-    
-#     # First try to serve as a static file
-#     static_file_path = os.path.join(app.static_folder, path)
-#     if path and os.path.isfile(static_file_path):
-#         return send_from_directory(app.static_folder, path)
-    
-#     # Otherwise return index.html for client-side routing
-#     return send_from_directory(app.static_folder, 'index.html')
-
 
 @app.route('/')
 def index():
@@ -470,13 +434,10 @@ def search_page():
 @app.route('/class/<course_id>')
 def class_details(course_id):
     try:
-        # Check if data was passed via URL parameter
         data_param = request.args.get('data')
         if data_param:
-            # Parse the JSON data
             class_data = json.loads(data_param)
         else:
-            # Otherwise get course data from API
             original_course_id = course_id.replace('-', ' ')
             
             course_info = None
@@ -488,7 +449,6 @@ def class_details(course_id):
             if not course_info:
                 return render_template('class_details.html', error="Course not found", class_data=None)
             
-            # Format the data for the template
             ratings = calculate_average_ratings(course_info.get("reviews", []))
             
             class_data = {
