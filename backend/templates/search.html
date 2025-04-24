@@ -1,5 +1,6 @@
-{% extends "base.html" %} {% block title %}Search Results - CourseFinder{%
-endblock %} {% block extra_head %}
+{% extends "base.html" %} {% from "components/similarity_sidebar.html" import
+render as render_similarity_sidebar %} {% block title %}Search Results -
+CourseFinder{% endblock %} {% block extra_head %}
 <style>
   .line-clamp-2 {
     display: -webkit-box;
@@ -22,6 +23,7 @@ endblock %} {% block extra_head %}
     display: none !important;
   }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %} {% block content %}
 <!-- Word Cloud Loading Animation -->
 {% if query %}
@@ -29,6 +31,9 @@ endblock %} {% block extra_head %}
   <!-- WordCloud will be rendered here -->
 </div>
 {% endif %}
+
+<!-- Render the similarity sidebar -->
+{{ render_similarity_sidebar() }}
 
 <!-- Search bar at the top -->
 <div class="bg-white shadow-sm p-4 sticky top-0 z-10">
@@ -219,8 +224,9 @@ endblock %} {% block extra_head %}
 </div>
 {% endblock %} {% block scripts %}
 <!-- Load Word Cloud Script -->
-
 <script src="{{ url_for('static', filename='js/word_cloud.js') }}"></script>
+<!-- Load Similarity Functionality -->
+<script src="{{ url_for('static', filename='js/similarity.js') }}"></script>
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
@@ -236,9 +242,13 @@ endblock %} {% block extra_head %}
     );
     const mainContent = document.getElementById("main-content");
     const wordCloudContainer = document.getElementById("word-cloud-container");
+    const similaritySidebar = document.getElementById("similarity-sidebar");
+
+    window.query = query; // Make query available globally for similarity calculation
 
     let allCourses = [];
     let selectedCourse = null;
+    window.selectedCourse = null; // For similarity sidebar access
     let wordCloud = null;
 
     // Initialize word cloud if query exists
@@ -277,6 +287,25 @@ endblock %} {% block extra_head %}
     document
       .getElementById("clear-filters")
       .addEventListener("click", clearFilters);
+
+    // Add event listeners for similarity sidebar
+    document.addEventListener("click", function (e) {
+      // Open sidebar when show-similarity button is clicked
+      if (
+        e.target.id === "show-similarity" ||
+        e.target.closest("#show-similarity")
+      ) {
+        openSimilaritySidebar();
+      }
+
+      // Close sidebar when close button is clicked
+      if (
+        e.target.id === "close-similarity" ||
+        e.target.closest("#close-similarity")
+      ) {
+        closeSimilaritySidebar();
+      }
+    });
 
     // Functions
     function fetchSearchResults(query) {
@@ -416,6 +445,7 @@ endblock %} {% block extra_head %}
 
     function selectCourse(course) {
       selectedCourse = course;
+      window.selectedCourse = course; // For similarity sidebar access
 
       // Update selected state in results list
       document.querySelectorAll("[data-id]").forEach((element) => {
@@ -437,7 +467,6 @@ endblock %} {% block extra_head %}
       renderCourseDetails(course);
     }
 
-    // The rest of the functions remain the same
     function renderCourseDetails(course) {
       // Prepare course data
       const courseData = {
@@ -455,10 +484,13 @@ endblock %} {% block extra_head %}
       let detailsHtml = `
         <div class="border rounded-lg shadow-sm mb-6">
           <div class="p-6">
-            <div class="mb-2 flex items-center">
-              <span class="text-lg font-medium text-gray-500 mr-2">
+            <div class="mb-2 flex justify-between items-center">
+              <span class="text-lg font-medium text-gray-500">
                 ${courseData.course_code}
               </span>
+              <button id="show-similarity" class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md text-sm font-medium transition">
+                Show Similarity
+              </button>
             </div>
             <h2 class="text-2xl font-bold mb-4">${courseData.title}</h2>
             <p class="text-gray-700 mb-4">${courseData.description}</p>
@@ -635,6 +667,155 @@ endblock %} {% block extra_head %}
       }
 
       return stars;
+    }
+
+    function openSimilaritySidebar() {
+      if (similaritySidebar) {
+        similaritySidebar.style.width = "350px";
+
+        // Generate similarity data for the selected course
+        generateSimilarityData();
+      }
+    }
+
+    function closeSimilaritySidebar() {
+      if (similaritySidebar) {
+        similaritySidebar.style.width = "0";
+      }
+    }
+
+    function generateSimilarityData() {
+      if (!window.selectedCourse || !window.query) return;
+
+      // Calculate similarity score (this would be replaced with actual algorithm)
+      // In a real implementation, this would come from the backend
+      const similarityScore = Math.random() * 30 + 70; // Random score between 70-100%
+
+      // Update similarity percentage
+      const percentageElement = document.getElementById(
+        "similarity-percentage"
+      );
+      if (percentageElement) {
+        percentageElement.textContent = `${similarityScore.toFixed(1)}%`;
+      }
+
+      // Generate radar chart data
+      const radarData = {
+        content: Math.random() * 0.8 + 0.2,
+        description: Math.random() * 0.8 + 0.2,
+        title: Math.random() * 0.8 + 0.2,
+        reviews: Math.random() * 0.8 + 0.2,
+        professor: Math.random() * 0.8 + 0.2,
+        keywords: Math.random() * 0.8 + 0.2,
+      };
+
+      // Create spider chart
+      createSpiderChart(radarData);
+
+      // Generate tags
+      generateTags();
+    }
+
+    function createSpiderChart(data) {
+      const ctx = document.getElementById("similarity-chart");
+
+      // Clear previous chart if it exists
+      if (window.similarityChart) {
+        window.similarityChart.destroy();
+      }
+
+      // Create the chart
+      window.similarityChart = new Chart(ctx, {
+        type: "radar",
+        data: {
+          labels: [
+            "Content Match",
+            "Description",
+            "Title",
+            "Reviews",
+            "Professor",
+            "Keywords",
+          ],
+          datasets: [
+            {
+              label: window.selectedCourse.course_code,
+              data: [
+                data.content * 100,
+                data.description * 100,
+                data.title * 100,
+                data.reviews * 100,
+                data.professor * 100,
+                data.keywords * 100,
+              ],
+              backgroundColor: "rgba(255, 99, 132, 0.2)",
+              borderColor: "rgba(255, 99, 132, 1)",
+              pointBackgroundColor: "rgba(255, 99, 132, 1)",
+              pointBorderColor: "#fff",
+              pointHoverBackgroundColor: "#fff",
+              pointHoverBorderColor: "rgba(255, 99, 132, 1)",
+            },
+          ],
+        },
+        options: {
+          scales: {
+            r: {
+              angleLines: {
+                display: true,
+              },
+              suggestedMin: 0,
+              suggestedMax: 100,
+            },
+          },
+        },
+      });
+    }
+
+    function generateTags() {
+      const tagsContainer = document.getElementById("similarity-tags");
+      if (!tagsContainer) return;
+
+      // Clear previous tags
+      tagsContainer.innerHTML = "";
+
+      // Generate 3-5 random tags related to the course
+      const possibleTags = [
+        "lecture",
+        "discussion",
+        "lab",
+        "project",
+        "research",
+        "writing",
+        "reading",
+        "programming",
+        "design",
+        "analysis",
+        "theory",
+        "application",
+        "teamwork",
+        "individual",
+        "exam",
+        "paper",
+        "presentation",
+      ];
+
+      // Select random tags
+      const numTags = Math.floor(Math.random() * 3) + 3; // 3-5 tags
+      const selectedTags = [];
+
+      for (let i = 0; i < numTags; i++) {
+        const randomIndex = Math.floor(Math.random() * possibleTags.length);
+        const tag = possibleTags[randomIndex];
+
+        if (!selectedTags.includes(tag)) {
+          selectedTags.push(tag);
+
+          // Create tag element
+          const tagElement = document.createElement("div");
+          tagElement.className = "px-3 py-1 bg-gray-200 rounded-full text-sm";
+          tagElement.textContent = tag;
+          tagsContainer.appendChild(tagElement);
+        }
+      }
     }
 
     function applyFilters() {

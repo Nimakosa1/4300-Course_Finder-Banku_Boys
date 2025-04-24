@@ -53,3 +53,31 @@ input[type="checkbox"] {
 .mb-6 {
     margin-bottom: 1.5rem;
 }
+
+#word-cloud-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 100;
+    background-color: #111111;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Similarity sidebar styles */
+#similarity-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 0;
+    background-color: white;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    z-index: 50;
+}
