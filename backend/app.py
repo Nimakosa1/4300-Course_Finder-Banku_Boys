@@ -4,8 +4,12 @@ from flask import Flask, request, jsonify, send_from_directory,render_template
 from flask_cors import CORS
 from nltk.tokenize import TreebankWordTokenizer
 import traceback
-from similarity import build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search
+from similarity import build_inverted_index, compute_doc_norms, compute_idf, search, build_semantic_search, semantic_search, stop_words, punctuation
 import numpy as np
+from sentence_transformers import SentenceTransformer
+import joblib
+from sklearn.metrics.pairwise import cosine_similarity
+from sentiment_utils import load_course_sentiments, get_query_sentiment, adjust_bert_scores_with_sentiment
 
 tokenizer = TreebankWordTokenizer()
 
@@ -21,6 +25,28 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 
 courses_path = os.path.join(current_directory, 'courses_w_tokens.json')
 reviews_path = os.path.join(current_directory, 'course_reviews.json')
+
+try:
+    print("Loading BERT embeddings...")
+    course_codes, bert_embeddings = joblib.load("bert_embeddings.joblib")
+    title_course_codes, title_embeddings = joblib.load("bert_title_embeddings.joblib")
+    bert_model = SentenceTransformer("all-MiniLM-L6-v2")
+    print("Successfully loaded BERT embeddings")
+except Exception as e:
+    print("Error loading BERT embeddings:", e)
+    bert_embeddings = None
+    course_codes = []
+    bert_model = None
+    
+#Get course sentiments   
+course_sentiments = load_course_sentiments()
+
+try:
+    with open("scaled_sentiment_scores.json", "r") as f:
+        scaled_sentiments = json.load(f)
+except:
+    print("failed to get scaled_sentiments")
+    scaled_sentiments = {}
 
 try:
     with open(courses_path, 'r') as file:
@@ -107,6 +133,56 @@ except Exception as e:
     print(f"Error building semantic search index: {str(e)}")
     traceback.print_exc()
 
+def compute_keyword_scores(query, inv_idx, idf, doc_norms, tokenizer, stop_words, punctuation):
+    query_token = tokenizer.tokenize(query.lower())
+    query_token = [t for t in query_token if t.lower() not in stop_words and t not in punctuation]
+    
+    q_counts = {}
+    for q in query_token:
+        q_counts[q] = q_counts.get(q, 0) + 1
+
+    from similarity import accumulate_dot_scores
+    dot_scores, _ = accumulate_dot_scores(q_counts, inv_idx, idf)
+    
+    q_tf_idf = {word: count * idf.get(word, 0) for word, count in q_counts.items()}
+    q_norm = np.sqrt(sum(value ** 2 for value in q_tf_idf.values()))
+
+    doc_score_lookup = {}
+    for doc_id, numerator in dot_scores.items():
+        denominator = q_norm * doc_norms[doc_id]
+        if denominator:
+            score = numerator / denominator
+            doc_score_lookup[doc_id] = score
+
+    return doc_score_lookup
+
+# SVD topic matching words function
+def get_svd_matching_words(query, course_description, vectorizer, svd, tokenizer, top_n_topics=5, top_n_words=10):
+    if not vectorizer or not svd:
+        return []
+
+    query_vec = vectorizer.transform([query])
+    query_reduced = svd.transform(query_vec)[0]
+    top_topic_indices = query_reduced.argsort()[::-1][:top_n_topics]
+
+    terms = vectorizer.get_feature_names_out()
+    components = svd.components_
+
+    top_topic_words = set()
+    for topic_idx in top_topic_indices:
+        word_weights = components[topic_idx]
+        top_indices = word_weights.argsort()[::-1][:top_n_words]
+        for i in top_indices:
+            top_topic_words.add(terms[i])
+
+    # Tokenize course description
+    course_tokens = tokenizer.tokenize(course_description.lower())
+    filtered_tokens = [t for t in course_tokens if t not in stop_words and t not in punctuation]
+
+    # Match topic words in the course description
+    matched_words = [word for word in filtered_tokens if word in top_topic_words]
+    return list(set(matched_words))
+
 def calculate_average_ratings(reviews):
     if not reviews:
         return {
@@ -150,6 +226,19 @@ def calculate_average_ratings(reviews):
         'avgOverall': overall_sum / overall_count if overall_count > 0 else 0
     }
 
+def bert_search(query, top_k=10):
+    query_embedding = bert_model.encode([query])
+    similarities = cosine_similarity(query_embedding, bert_embeddings)[0]
+    top_indices = similarities.argsort()[::-1][:top_k]
+    results = [(similarities[i], i) for i in top_indices]
+    return results
+
+def get_bert_title_similarity_scores(query, top_k=10):
+    query_vec = bert_model.encode([query])
+    sims = cosine_similarity(query_vec, title_embeddings)[0]
+    score_map = {code: sim for code, sim in zip(title_course_codes, sims)}
+    return score_map
+
 def simple_search(query, courses):
     """Fallback search function that uses basic string matching"""
     query = query.lower()
@@ -189,10 +278,16 @@ def api_search():
         
         search_results = []
         
+        #Get query sentiment
+        query_sentiment = get_query_sentiment(query)
+        
         # Use semantic search if available
-        if vectorizer and svd and X_reduced is not None:
-            print("Using semantic search")
-            search_results = semantic_search(query, vectorizer, svd, X_reduced, courses_list, tokenizer, 20)
+        # if vectorizer and svd and X_reduced is not None:
+        #     print("Using semantic search")
+        #     search_results = semantic_search(query, vectorizer, svd, X_reduced, courses_list, tokenizer, 20)
+        if bert_model and bert_embeddings is not None:
+            print("Using BERT semantic search")
+            search_results = bert_search(query, 20)
         else:
             # Use vector space model search if available
             if search_function and inv_idx and idf is not None and doc_norms is not None and len(doc_norms) > 0:
@@ -206,6 +301,11 @@ def api_search():
                 print("Using simple search fallback")
                 search_results = simple_search(query, courses_list)
         
+               # Compute keyword search results and scores for top results
+        keyword_search_results = search_function(query, inv_idx, idf, doc_norms)
+        keyword_score_map = {idx: round(score * 100, 0) for score, idx, *_ in keyword_search_results}
+        title_score_map = get_bert_title_similarity_scores(query)
+            
         if not search_results:
             print("No search results found")
             return jsonify([])
@@ -215,14 +315,17 @@ def api_search():
             review_count = len(course.get("reviews", []))
             return score * (1 + np.log1p(review_count))
 
-        rescored = []
-        for item in search_results:
-            score, idx = item[0], item[1]
-            if idx < len(courses_list):
-                course = courses_list[idx]
-                new_score = adjusted_score(score, course)
-                rescored.append((new_score, idx))
-
+        ##### <------Deprecated------>
+        # rescored = []
+        # for item in search_results:
+        #     score, idx = item[0], item[1]
+        #     if idx < len(courses_list):
+        #         course = courses_list[idx]
+        #         new_score = adjusted_score(score, course)
+        #         rescored.append((new_score, idx))
+        
+        # Readjust scores using sentiment from queries
+        rescored = adjust_bert_scores_with_sentiment(query_sentiment, course_sentiments, search_results, course_codes, alpha=0.3)
         top_results = sorted(rescored, key=lambda x: -x[0])[:10]
             
         # Convert search results to course objects
@@ -236,14 +339,14 @@ def api_search():
                 description = course.get("description")
                 if description and description not in seen_descriptions:
                     seen_descriptions.add(description)
-                    result.append(course)
+                    result.append((course, round(score, 4)))
             else:
                 print(f"Invalid index {idx} (out of range)")
         
         print(f"Found {len(result)} results")
         
         formatted_results = []
-        for course in result:
+        for course, similarity_score in result:
             try:
                 course_copy = course.copy()
                 if "description_tokens" in course_copy:
@@ -251,7 +354,27 @@ def api_search():
                     
                 ratings = calculate_average_ratings(course_copy.get("reviews", []))
                 course_copy.update(ratings)
-                    
+                course_code = course_copy.get("course_code")
+                
+                course_copy["sentiment_score"] = scaled_sentiments.get(course_code, 50)
+                
+                course_copy["BERT_similarity_score"] = round(similarity_score * 100, 0)
+                
+                idx = next((i for i, c in enumerate(courses_list) if c.get("course_code") == course_copy.get("course_code")), None)
+                course_copy["keyword_score"] = keyword_score_map.get(idx, 0)
+                
+                raw_score = title_score_map.get(course_code, 0)
+                course_copy["BERT_title_similarity_score"] = round(raw_score * 100, 0)
+
+                # Add SVD topic words matching
+                course_copy["svd_top_words"] = get_svd_matching_words(
+                    query,
+                    course_copy.get("description", ""),
+                    vectorizer,
+                    svd,
+                    tokenizer
+                )
+                
                 formatted_results.append(course_copy)
             except Exception as e:
                 print(f"Error formatting course: {e}")
