@@ -42,6 +42,8 @@ function generateSimilarityData() {
   };
 
   createSpiderChart(radarData);
+
+  generateTags();
 }
 
 function calculateReviewScore(course) {
@@ -129,6 +131,31 @@ function createSpiderChart(data) {
       },
     },
   });
+}
+
+function generateTags() {
+  const tagsContainer = document.getElementById("similarity-tags");
+  if (!tagsContainer || !window.selectedCourse) return;
+
+  tagsContainer.innerHTML = "";
+
+  const svdTopWords = window.selectedCourse.svd_top_words || [];
+
+  if (svdTopWords.length > 0) {
+    svdTopWords.forEach((word) => {
+      if (word && word.trim()) {
+        const tagElement = document.createElement("div");
+        tagElement.className = "px-3 py-1 bg-gray-200 rounded-full text-sm";
+        tagElement.textContent = word;
+        tagsContainer.appendChild(tagElement);
+      }
+    });
+  } else {
+    const noTagsElement = document.createElement("p");
+    noTagsElement.className = "text-sm text-gray-500";
+    noTagsElement.textContent = "No key concepts available for this course";
+    tagsContainer.appendChild(noTagsElement);
+  }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
