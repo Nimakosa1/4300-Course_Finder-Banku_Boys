@@ -34,13 +34,27 @@ Class{% endblock %} {% block content %}
 
   <div class="w-1/2 relative">
     <div class="w-full h-full absolute inset-0 z-0">
-      <script
+      <!-- <script
         type="module"
         src="https://unpkg.com/@splinetool/viewer@1.9.82/build/spline-viewer.js"
       ></script>
       <spline-viewer
         url="https://prod.spline.design/Z8XuY8Nf4msNsbHi/scene.splinecode"
-      ></spline-viewer>
+      ></spline-viewer> -->
+
+      <script
+        type="module"
+        src="https://unpkg.com/@splinetool/viewer@1.9.86/build/spline-viewer.js"
+        async
+      ></script>
+      <spline-viewer
+        loading-anim-type="spinner-small-light"
+        url="https://prod.spline.design/GcY3EtKO7X-quZkD/scene.splinecode"
+        ><img
+          src="data:image/png;base64,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"
+          alt="Spline preview"
+          style="width: 100%; height: 100%"
+      /></spline-viewer>
     </div>
 
     <div
