@@ -7,7 +7,6 @@ class WordCloud {
     this.completedCount = 0;
     this.onCompleteCallback = null;
 
-    // Set up canvas
     this.canvas = document.createElement("canvas");
     this.canvas.width = container.offsetWidth || window.innerWidth;
     this.canvas.height = container.offsetHeight || window.innerHeight;
@@ -16,20 +15,16 @@ class WordCloud {
 
     this.ctx = this.canvas.getContext("2d");
 
-    // Position words in 3D space
     this.positionWords();
 
-    // Start animation
     this.animate();
 
-    // Set timeout to end loading
     setTimeout(() => {
       this.isLoading = false;
     }, 2000);
   }
 
   getRandomWords() {
-    // Comprehensive list of academic terms across disciplines
     const allWords = [
       // Natural Sciences
       { text: "physics", size: 3.7 },
@@ -152,21 +147,19 @@ class WordCloud {
       { text: "seminar", size: 3.5 },
     ];
 
-    // Randomly select 40-50 words
-    const numWords = Math.floor(Math.random() * 11) + 40; // 40 to 50 words
+    const numWords = Math.floor(Math.random() * 11) + 40;
     const shuffled = [...allWords].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, numWords);
   }
 
   positionWords() {
-    // Distribute points on a sphere using Fibonacci algorithm
-    const phi = Math.PI * (3 - Math.sqrt(5)); // Golden angle in radians
+    const phi = Math.PI * (3 - Math.sqrt(5));
 
     this.words = this.words.map((word, i) => {
-      const y = 1 - (i / (this.words.length - 1)) * 2; // y goes from 1 to -1
-      const radius = Math.sqrt(1 - y * y); // radius at y
+      const y = 1 - (i / (this.words.length - 1)) * 2;
+      const radius = Math.sqrt(1 - y * y);
 
-      const theta = phi * i; // Golden angle increment
+      const theta = phi * i;
 
       const x = Math.cos(theta) * radius;
       const z = Math.sin(theta) * radius;
@@ -184,37 +177,28 @@ class WordCloud {
   }
 
   animate() {
-    // Clear canvas
     this.ctx.fillStyle = "#111111";
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Center point
     const centerX = this.canvas.width / 2;
     const centerY = this.canvas.height / 2;
 
-    // Time for rotation
-    const time = Date.now() * 0.0003;
+    const time = Date.now() * 0.0002;
 
-    // Sort words by z position (painter's algorithm for primitive depth)
     const sortedWords = [...this.words].sort((a, b) => {
-      // Rotate positions
       const aZ = a.z * Math.cos(time) - a.x * Math.sin(time);
       const bZ = b.z * Math.cos(time) - b.x * Math.sin(time);
       return aZ - bZ;
     });
 
-    // Draw words
     sortedWords.forEach((word) => {
-      // Rotate around Y axis
       const x = word.x * Math.cos(time) + word.z * Math.sin(time);
       const z = word.z * Math.cos(time) - word.x * Math.sin(time);
 
-      // Apply perspective
       const scale = 1500 / (1500 + z);
       const screenX = centerX + x * scale;
       const screenY = centerY + word.y * scale;
 
-      // Handle loading animation
       if (!this.isLoading && !word.completed) {
         word.opacity = Math.max(0, word.opacity - 0.05);
         if (word.opacity <= 0.05) {
@@ -230,7 +214,6 @@ class WordCloud {
         }
       }
 
-      // Draw text
       this.ctx.save();
       this.ctx.translate(screenX, screenY);
       this.ctx.rotate((word.rotation * Math.PI) / 180);
@@ -242,13 +225,11 @@ class WordCloud {
       this.ctx.restore();
     });
 
-    // Continue animation
     this.animationId = requestAnimationFrame(() => this.animate());
   }
 
   setOnComplete(callback) {
     this.onCompleteCallback = callback;
-    // If animation is already complete, run callback immediately
     if (this.completedCount >= this.words.length) {
       callback();
     }

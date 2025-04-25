@@ -4,9 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}CourseFinder{% endblock %}</title>
-    <!-- Include Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Custom styles -->
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/style.css') }}"
@@ -18,7 +16,6 @@
   <body class="min-h-screen bg-gray-50">
     {% block content %}{% endblock %}
 
-    <!-- Include JavaScript -->
     <script src="{{ url_for('static', filename='js/components.js') }}"></script>
     {% block scripts %}{% endblock %}
   </body>

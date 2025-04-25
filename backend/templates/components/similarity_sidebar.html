@@ -4,7 +4,6 @@
   class="fixed top-0 right-0 h-full w-0 bg-white shadow-lg transition-all duration-300 overflow-hidden z-50"
 >
   <div class="p-4 h-full overflow-y-auto">
-    <!-- Close button -->
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-bold">Similarity Analysis</h2>
       <button id="close-similarity" class="text-gray-500 hover:text-gray-700">
@@ -25,25 +24,42 @@
       </button>
     </div>
 
-    <!-- Similarity Score -->
     <div class="mb-6 text-center">
-      <h3 class="text-lg font-semibold mb-2">SIMILARITY SCORE:</h3>
+      <h3 class="text-lg font-semibold mb-2">MATCH SCORE:</h3>
       <div class="text-4xl font-bold text-blue-600" id="similarity-percentage">
         0.0%
       </div>
+      <p class="text-sm text-gray-600 mt-2">
+        Based on semantic analysis of your search query
+      </p>
     </div>
 
-    <!-- Spider Chart -->
     <div class="mb-6">
+      <h3 class="text-lg font-semibold mb-2">MATCH BREAKDOWN:</h3>
       <canvas id="similarity-chart" width="300" height="300"></canvas>
     </div>
 
-    <!-- Tags Section -->
-    <div class="mt-8">
-      <h3 class="text-lg font-semibold mb-3">TAGS FROM COURSE CONTENT</h3>
-      <div id="similarity-tags" class="flex flex-wrap gap-2">
-        <!-- Tags will be dynamically inserted here -->
-      </div>
+    <div class="mb-6">
+      <h3 class="text-lg font-semibold mb-2">WHY THIS MATCH?</h3>
+      <p class="text-sm text-gray-700">
+        This course was matched to your search using different criteria:
+      </p>
+      <ul class="text-sm text-gray-700 list-disc pl-5 mt-2">
+        <li>
+          <strong>Content Match:</strong> Similarity between course content and
+          your search
+        </li>
+        <li>
+          <strong>Keyword Match:</strong> Relevant keywords in course
+          description
+        </li>
+        <li>
+          <strong>Title Match:</strong> How well the course title matches your
+          query
+        </li>
+        <li><strong>Sentiment:</strong> Overall sentiment of course reviews</li>
+        <li><strong>Reviews:</strong> Student ratings and feedback</li>
+      </ul>
     </div>
   </div>
 </div>

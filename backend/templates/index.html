@@ -33,7 +33,6 @@ Class{% endblock %} {% block content %}
   </div>
 
   <div class="w-1/2 relative">
-    <!-- Spline Robot Component (positioned behind the wheel) -->
     <div class="w-full h-full absolute inset-0 z-0">
       <script
         type="module"
@@ -44,13 +43,12 @@ Class{% endblock %} {% block content %}
       ></spline-viewer>
     </div>
 
-    <!-- Course wheel component (positioned on top with higher z-index) -->
-    <div id="course-wheel" class="absolute right-0 top-0 w-1/3 h-full z-10">
-      <!-- Course wheel will be added via JavaScript -->
-    </div>
+    <div
+      id="course-wheel"
+      class="absolute right-0 top-0 w-1/3 h-full z-10"
+    ></div>
   </div>
 </div>
 
-<!-- Include the course wheel JavaScript -->
 <script src="{{ url_for('static', filename='js/course_wheel.js') }}"></script>
 {% endblock %}

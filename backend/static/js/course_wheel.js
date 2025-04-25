@@ -2,18 +2,15 @@ document.addEventListener("DOMContentLoaded", function () {
   const courseWheelContainer = document.getElementById("course-wheel");
   if (!courseWheelContainer) return;
 
-  // Class data to display in the wheel
   let classes = [];
   let selectedIndex = 0;
   let autoScrollPaused = false;
   let autoScrollInterval = null;
 
-  // Fetch random courses
   fetch("/api/get_courses")
     .then((response) => response.json())
     .then((data) => {
       if (data && data.courses && data.courses.length > 0) {
-        // Get random subset of courses
         classes = getRandomCourses(data.courses, 30);
         renderCourseWheel();
         startAutoScroll();
@@ -33,17 +30,14 @@ document.addEventListener("DOMContentLoaded", function () {
   function renderCourseWheel() {
     courseWheelContainer.innerHTML = "";
 
-    // Create a container for the wheel items
     const wheelItemsContainer = document.createElement("div");
     wheelItemsContainer.className =
       "w-full h-full relative overflow-visible pt-0";
     wheelItemsContainer.style.perspective = "1000px";
 
-    // Create an inner container for absolute positioning
     const innerContainer = document.createElement("div");
     innerContainer.className = "absolute inset-0";
 
-    // Add course items
     classes.forEach((classItem, index) => {
       const distance = index - selectedIndex;
       const wrappedDistance =
@@ -108,7 +102,6 @@ document.addEventListener("DOMContentLoaded", function () {
       innerContainer.appendChild(courseItem);
     });
 
-    // Add pause/play button
     const controlButton = document.createElement("button");
     controlButton.className =
       "absolute bottom-5 right-4 flex items-center gap-4 px-10 py-2 bg-gray-800 text-white rounded-full hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500";
@@ -124,12 +117,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     controlButton.addEventListener("click", toggleAutoScroll);
 
-    // Add all elements to the container
     wheelItemsContainer.appendChild(innerContainer);
     courseWheelContainer.appendChild(wheelItemsContainer);
     courseWheelContainer.appendChild(controlButton);
 
-    // Add wheel event listener
     courseWheelContainer.addEventListener("wheel", handleWheel);
   }
 
@@ -168,11 +159,9 @@ document.addEventListener("DOMContentLoaded", function () {
     pauseAutoScroll();
 
     if (e.deltaY < 0) {
-      // Scroll up
       selectedIndex =
         selectedIndex <= 0 ? classes.length - 1 : selectedIndex - 1;
     } else {
-      // Scroll down
       selectedIndex =
         selectedIndex >= classes.length - 1 ? 0 : selectedIndex + 1;
     }
