@@ -1,0 +1,23 @@
+{% macro render(query='') %}
+<div class="md:col-span-3">
+  <h2 class="text-xl font-semibold mb-4">
+    Search Results (<span id="results-count">0</span>)
+  </h2>
+
+  <div
+    id="error-message"
+    class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 hidden"
+  ></div>
+
+  <div
+    id="search-results"
+    class="space-y-6 max-h-[calc(100vh-180px)] overflow-y-auto pr-2 pb-4"
+  >
+    <p id="loading-message" class="text-gray-500">Loading courses...</p>
+    <p id="no-results-message" class="text-gray-500 hidden">
+      {% if query %} No results found for "{{ query }}" {% else %} Enter a
+      search query {% endif %}
+    </p>
+  </div>
+</div>
+{% endmacro %}

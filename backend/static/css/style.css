@@ -1,12 +1,10 @@
-/* Line-clamp utility for browsers that might not support it natively */
 .line-clamp-2 {
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-/* Custom scrollbar styling */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -26,7 +24,6 @@
     background: #a8a8a8;
 }
 
-/* Improve focus states for accessibility */
 input:focus,
 button:focus,
 a:focus,
@@ -35,7 +32,6 @@ a:focus,
     outline-offset: 2px;
 }
 
-/* Make sure checkboxes are visible and accessible */
 input[type="checkbox"] {
     width: 16px;
     height: 16px;
@@ -44,12 +40,10 @@ input[type="checkbox"] {
     cursor: pointer;
 }
 
-/* Card hover effects */
 .border {
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-/* Consistent spacing */
 .mb-6 {
     margin-bottom: 1.5rem;
 }
@@ -68,7 +62,6 @@ input[type="checkbox"] {
     display: none !important;
 }
 
-/* Similarity sidebar styles */
 #similarity-sidebar {
     position: fixed;
     top: 0;

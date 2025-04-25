@@ -355,7 +355,6 @@ def api_search():
                 formatted_results.append(course_copy)
             except Exception as e:
                 print(f"Error formatting course: {e}")
-        
         return jsonify(formatted_results)
     
     except Exception as e:

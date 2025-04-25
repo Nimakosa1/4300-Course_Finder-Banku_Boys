@@ -1,22 +1,20 @@
-/**
- * Course Similarity Visualization
- *
- * This file contains functions to display and manage the similarity sidebar
- * that shows how a course relates to the user's search query.
- */
+function isSimilaritySidebarOpen() {
+  const sidebar = document.getElementById("similarity-sidebar");
+  if (sidebar) {
+    return sidebar.style.width === "350px";
+  }
+  return false;
+}
 
-// Function to open the similarity sidebar
 function openSimilaritySidebar() {
   const sidebar = document.getElementById("similarity-sidebar");
   if (sidebar) {
     sidebar.style.width = "350px";
 
-    // Generate visualization data
     generateSimilarityData();
   }
 }
 
-// Function to close the similarity sidebar
 function closeSimilaritySidebar() {
   const sidebar = document.getElementById("similarity-sidebar");
   if (sidebar) {
@@ -24,57 +22,69 @@ function closeSimilaritySidebar() {
   }
 }
 
-// Generate the similarity data visualization
 function generateSimilarityData() {
   if (!window.selectedCourse || !window.query) return;
 
-  // Calculate similarity score (this would be replaced with actual algorithm)
-  // In a real implementation, this would come from the backend
-  const similarityScore = Math.random() * 30 + 70; // Random score between 70-100%
+  const similarityScore = window.selectedCourse.BERT_similarity_score || 0;
 
-  // Update similarity percentage
   const percentageElement = document.getElementById("similarity-percentage");
   if (percentageElement) {
     percentageElement.textContent = `${similarityScore.toFixed(1)}%`;
   }
 
-  // Generate radar chart data
   const radarData = {
-    content: Math.random() * 0.8 + 0.2,
-    description: Math.random() * 0.8 + 0.2,
-    title: Math.random() * 0.8 + 0.2,
-    reviews: Math.random() * 0.8 + 0.2,
-    professor: Math.random() * 0.8 + 0.2,
-    keywords: Math.random() * 0.8 + 0.2,
+    content: window.selectedCourse.BERT_similarity_score || 0,
+    keywords: window.selectedCourse.keyword_score || 0,
+    title: window.selectedCourse.BERT_title_similarity_score || 0,
+    sentiment: window.selectedCourse.sentiment_score || 0,
+    reviews: calculateReviewScore(window.selectedCourse),
+    relevance: calculateOverallRelevance(window.selectedCourse),
   };
 
-  // Create spider chart
   createSpiderChart(radarData);
-
-  // Generate tags
-  generateTags();
 }
 
-// Create the spider chart visualization
+function calculateReviewScore(course) {
+  if (course.avgOverall && course.avgOverall > 0) {
+    return course.avgOverall * 20;
+  }
+
+  if (course.avgDifficulty && course.avgDifficulty > 0) {
+    return (6 - course.avgDifficulty) * 20;
+  }
+
+  return 50;
+}
+
+function calculateOverallRelevance(course) {
+  const scores = [
+    course.BERT_similarity_score || 0,
+    course.keyword_score || 0,
+    course.BERT_title_similarity_score || 0,
+  ];
+
+  const sum = scores.reduce((total, score) => total + score, 0);
+  return sum / scores.length;
+}
+
 function createSpiderChart(data) {
   const ctx = document.getElementById("similarity-chart");
+  if (!ctx) return;
 
-  // Clear previous chart if it exists
   if (window.similarityChart) {
     window.similarityChart.destroy();
   }
 
-  // Create the chart
   window.similarityChart = new Chart(ctx, {
     type: "radar",
     data: {
       labels: [
         "Content Match",
-        "Description",
-        "Title",
+        "Keyword Match",
+        "Title Match",
+        "Sentiment",
         "Reviews",
-        "Professor",
-        "Keywords",
+        "Overall Relevance",
       ],
       datasets: [
         {
@@ -82,12 +92,12 @@ function createSpiderChart(data) {
             ? window.selectedCourse.course_code
             : "Course",
           data: [
-            data.content * 100,
-            data.description * 100,
-            data.title * 100,
-            data.reviews * 100,
-            data.professor * 100,
-            data.keywords * 100,
+            data.content,
+            data.keywords,
+            data.title,
+            data.sentiment,
+            data.reviews,
+            data.relevance,
           ],
           backgroundColor: "rgba(255, 99, 132, 0.2)",
           borderColor: "rgba(255, 99, 132, 1)",
@@ -108,55 +118,23 @@ function createSpiderChart(data) {
           suggestedMax: 100,
         },
       },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              return `${context.label}: ${context.raw.toFixed(1)}%`;
+            },
+          },
+        },
+      },
     },
   });
 }
 
-// Generate tags related to the course and search query
-function generateTags() {
-  const tagsContainer = document.getElementById("similarity-tags");
-  if (!tagsContainer) return;
-
-  // Clear previous tags
-  tagsContainer.innerHTML = "";
-
-  // Generate 3-5 random tags related to the course
-  const possibleTags = [
-    "lecture",
-    "discussion",
-    "lab",
-    "project",
-    "research",
-    "writing",
-    "reading",
-    "programming",
-    "design",
-    "analysis",
-    "theory",
-    "application",
-    "teamwork",
-    "individual",
-    "exam",
-    "paper",
-    "presentation",
-  ];
-
-  // Select random tags
-  const numTags = Math.floor(Math.random() * 3) + 3; // 3-5 tags
-  const selectedTags = [];
-
-  for (let i = 0; i < numTags; i++) {
-    const randomIndex = Math.floor(Math.random() * possibleTags.length);
-    const tag = possibleTags[randomIndex];
-
-    if (!selectedTags.includes(tag)) {
-      selectedTags.push(tag);
-
-      // Create tag element
-      const tagElement = document.createElement("div");
-      tagElement.className = "px-3 py-1 bg-gray-200 rounded-full text-sm";
-      tagElement.textContent = tag;
-      tagsContainer.appendChild(tagElement);
+document.addEventListener("DOMContentLoaded", function () {
+  window.updateSimilaritySidebar = function () {
+    if (isSimilaritySidebarOpen()) {
+      generateSimilarityData();
     }
-  }
-}
+  };
+});
