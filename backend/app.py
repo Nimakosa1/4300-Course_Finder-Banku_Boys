@@ -273,9 +273,6 @@ def api_search():
         # Parse them safely
         relevant_ids = ast.literal_eval(relevant_ids) if relevant_ids else []
         non_relevant_ids = ast.literal_eval(non_relevant_ids) if non_relevant_ids else []
-        print(relevant_ids)
-        print(non_relevant_ids)
-
 
         #### ROCCHIO
         

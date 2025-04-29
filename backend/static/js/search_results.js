@@ -311,6 +311,8 @@ document.addEventListener("DOMContentLoaded", function () {
       >
         ❌ Not Relevant
       </button>
+    // < !--Relevance Feedback Buttons-- >
+
     </div>
       `;
     // < !--Relevance Feedback Buttons-- >
@@ -425,6 +427,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     courseDetails.innerHTML = detailsHtml;
 
+
+    // ROCCHIO
+
     const relBtn = courseDetails.querySelector("[data-relevant-btn]");
     const nonRelBtn = courseDetails.querySelector("[data-nonrelevant-btn]");
     const cid = course.course_code;
@@ -446,6 +451,7 @@ document.addEventListener("DOMContentLoaded", function () {
       relBtn.classList.remove("bg-green-200");
       fetchSearchResults(window.query);
     });
+    // ROCCHIO
 
 
   }
