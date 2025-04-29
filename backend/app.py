@@ -262,6 +262,22 @@ def simple_search(query, courses):
 def api_search():
     try:
         query = request.args.get('q', '')
+
+
+        #### ROCCHIO
+        import ast
+
+        relevant_ids = request.args.get('relevant_ids', None)
+        non_relevant_ids = request.args.get('non_relevant_ids', None)
+
+        # Parse them safely
+        relevant_ids = ast.literal_eval(relevant_ids) if relevant_ids else []
+        non_relevant_ids = ast.literal_eval(non_relevant_ids) if non_relevant_ids else []
+        print(relevant_ids)
+        print(non_relevant_ids)
+
+
+        #### ROCCHIO
         
         if not query:
             return jsonify([])
@@ -290,6 +306,26 @@ def api_search():
             else:
                 print("Using simple search fallback")
                 search_results = simple_search(query, courses_list)
+        #### ROCCHIO
+                
+        rel_codes = relevant_ids  # list of strings
+        rel_indices = [ course_codes.index(c) for c in rel_codes if c in course_codes ]
+        nonrel_codes = non_relevant_ids
+        nonrel_indices = [ course_codes.index(c) for c in nonrel_codes if c in course_codes ]
+        if relevant_ids or non_relevant_ids:
+            print("Applying Rocchio adjustment based on feedback")
+            relevant_vectors = [bert_embeddings[i] for i in rel_indices]
+            non_relevant_vectors = [bert_embeddings[i] for i in nonrel_indices]
+
+            # Assuming bert_search(query) uses embeddings
+            query_vector = encode_query_with_bert(query)  # you might have a function like this
+            
+            updated_query_vector = rocchio_update(query_vector, relevant_vectors, non_relevant_vectors)
+            
+            # Now re-search using the adjusted query vector
+            search_results = bert_search_with_query_vector(updated_query_vector, top_k=20)
+
+        #### ROCCHIO
         
         keyword_search_results = search_function(query, inv_idx, idf, doc_norms)
         keyword_score_map = {idx: round(score * 100, 0) for score, idx, *_ in keyword_search_results}
@@ -468,6 +504,35 @@ def class_details(course_id):
         print(f"Error rendering class details: {str(e)}")
         traceback.print_exc()
         return render_template('class_details.html', error=f"Error loading course: {str(e)}", class_data=None)
+    
+
+##### ROCCHIO
+def rocchio_update(query_vector, relevant_vectors, non_relevant_vectors, alpha=1.0, beta=0.75, gamma=0.25):
+    import numpy as np
+    
+    if not relevant_vectors:
+        relevant_centroid = np.zeros_like(query_vector)
+    else:
+        relevant_centroid = np.mean(relevant_vectors, axis=0)
+        
+    if not non_relevant_vectors:
+        non_relevant_centroid = np.zeros_like(query_vector)
+    else:
+        non_relevant_centroid = np.mean(non_relevant_vectors, axis=0)
+        
+    updated_query = alpha * query_vector + beta * relevant_centroid - gamma * non_relevant_centroid
+    return updated_query
+
+def encode_query_with_bert(query):
+    return bert_model.encode([query])[0]  # [0] to get just the vector, not a list of one
+
+def bert_search_with_query_vector(query_vector, top_k=10):
+    similarities = cosine_similarity([query_vector], bert_embeddings)[0]
+    top_indices = similarities.argsort()[::-1][:top_k]
+    results = [(similarities[i], i) for i in top_indices]
+    return results
+
+#### ROCCHIO
     
 
 if __name__ == '__main__':

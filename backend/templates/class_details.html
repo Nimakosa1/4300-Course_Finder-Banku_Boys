@@ -4,9 +4,7 @@ render_review_card %} {% block title %}{{ class_data.title if class_data else
 'Class Details' }} - CourseFinder{% endblock %} {% block content %} {{
 render_search_bar() }} {% if error %}
 <div class="max-w-7xl mx-auto p-4 mt-6">
-  <div
-    class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
-  >
+  <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
     {{ error }}
   </div>
 </div>
@@ -24,9 +22,7 @@ render_search_bar() }} {% if error %}
     </span>
     <div class="flex flex-wrap gap-2">
       {% for sem in class_data.semester %}
-      <span
-        class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800"
-      >
+      <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
         {{ sem }}
       </span>
       {% endfor %}
@@ -35,9 +31,7 @@ render_search_bar() }} {% if error %}
   <h1 class="text-4xl font-bold mb-2">{{ class_data.title }}</h1>
   <div class="flex flex-wrap gap-2 mb-4">
     {% for dist in class_data.distribution %}
-    <span
-      class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800"
-    >
+    <span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
       {{ dist }}
     </span>
     {% endfor %}
