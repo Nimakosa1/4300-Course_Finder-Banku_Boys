@@ -397,6 +397,83 @@ def api_search():
         print(f"Error in api_search: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+    
+    
+@app.route("/api/course", methods=["GET"])
+def get_similar_course():
+    try:
+        query_code = request.args.get('q', '').strip()
+        if not query_code:
+            return jsonify({"error": "Missing course code"}), 400
+
+        if query_code not in course_codes:
+            return jsonify({"error": "Invalid course code"}), 404
+
+        # Get the index and BERT embedding of the course
+        course_idx = course_codes.index(query_code)
+        query_embedding = bert_embeddings[course_idx]
+
+        # Get top matches using BERT
+        similarities = cosine_similarity([query_embedding], bert_embeddings)[0]
+        top_indices = similarities.argsort()[::-1][:20]  # Include original for now
+
+        # Exclude the original course itself
+        top_indices = [i for i in top_indices if i != course_idx][:10]
+
+        query_sentiment = course_sentiments.get(query_code, 0)
+
+        # Adjust BERT scores with sentiment
+        base_results = [(similarities[i], i) for i in top_indices]
+        rescored = adjust_bert_scores_with_sentiment(query_sentiment, course_sentiments, base_results, course_codes, alpha=0.3)
+
+        # Prepare helper maps
+        course = courses_list[course_idx]
+        course_title = course.get("course title") or course.get("title") or ""
+        title_score_map = get_bert_title_similarity_scores(course_title)
+        keyword_score_map = compute_keyword_scores(course.get("description", ""), inv_idx, idf, doc_norms, tokenizer, stop_words, punctuation)
+
+        formatted_results = []
+        seen_descriptions = set()
+
+        for sim_score, idx in sorted(rescored, key=lambda x: -x[0]):
+            if idx < len(courses_list):
+                course_data = courses_list[idx]
+                description = course_data.get("description", "")
+                if description and description not in seen_descriptions:
+                    seen_descriptions.add(description)
+                    course_copy = course_data.copy()
+                    if "description_tokens" in course_copy:
+                        del course_copy["description_tokens"]
+
+                    course_code = course_copy.get("course_code")
+
+                    course_copy["BERT_similarity_score"] = round(sim_score * 100, 0)
+                    course_copy["sentiment_score"] = scaled_sentiments.get(course_code, 50)
+
+                    idx_in_list = next((i for i, c in enumerate(courses_list) if c.get("course_code") == course_code), None)
+                    course_copy["keyword_score"] = round(keyword_score_map.get(idx_in_list, 0) * 100, 0)
+
+                    course_copy["BERT_title_similarity_score"] = round(title_score_map.get(course_code, 0) * 100, 0)
+
+                    course_copy["svd_top_words"] = get_svd_matching_words(
+                        course.get("description", ""),
+                        course_copy.get("description", ""),
+                        vectorizer,
+                        svd,
+                        tokenizer
+                    )
+
+                    ratings = calculate_average_ratings(course_copy.get("reviews", []))
+                    course_copy.update(ratings)
+
+                    formatted_results.append(course_copy)
+
+        return jsonify(formatted_results)
+
+    except Exception as e:
+        print(f"Error in get_similar_course: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/course/<course_id>", methods=["GET"])
 def api_get_course(course_id):
