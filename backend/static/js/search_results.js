@@ -1,3 +1,7 @@
+// keep in module scope
+let relevantIds = [];
+let nonRelevantIds = [];
+
 document.addEventListener("DOMContentLoaded", function () {
   const query = window.serverData?.query || "";
   const searchResults = document.getElementById("search-results");
@@ -70,10 +74,16 @@ document.addEventListener("DOMContentLoaded", function () {
     noResultsMessage.classList.add("hidden");
     errorMessage.classList.add("hidden");
 
+    const params = new URLSearchParams({
+      q: query,
+      relevant_ids: JSON.stringify(relevantIds),
+      non_relevant_ids: JSON.stringify(nonRelevantIds)
+    });
+
     searchResults.innerHTML = "";
     searchResults.appendChild(loadingMessage);
 
-    const apiUrl = `/api/search?q=${encodeURIComponent(query)}`;
+    const apiUrl = `/api/search?${params.toString()}`;
 
     fetch(apiUrl)
       .then((response) => {
@@ -149,18 +159,17 @@ document.addEventListener("DOMContentLoaded", function () {
         (course.distribution || course.distributions || []).length > 0
           ? `<div class="mt-2 flex flex-wrap gap-1">
               ${(course.distribution || course.distributions || [])
-                .map(
-                  (dist) =>
-                    `<span class="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">${dist}</span>`
-                )
-                .join("")}
+            .map(
+              (dist) =>
+                `<span class="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">${dist}</span>`
+            )
+            .join("")}
             </div>`
           : "";
 
       classItem.innerHTML = `
-            <div class="border rounded-lg transition-shadow cursor-pointer ${borderClass}" data-id="${
-        course.course_code
-      }">
+            <div class="border rounded-lg transition-shadow cursor-pointer ${borderClass}" data-id="${course.course_code
+        }">
               <div class="p-4">
                 <div class="flex items-center space-x-2 mb-1">
                   <span class="text-sm font-medium text-gray-500">
@@ -170,9 +179,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     ${semesterHtml}
                   </div>
                 </div>
-                <h3 class="font-semibold">${
-                  course["course title"] || course.title || "No Title"
-                }</h3>
+                <h3 class="font-semibold">${course["course title"] || course.title || "No Title"
+        }</h3>
                 <p class="text-sm text-gray-600 mt-1 line-clamp-2">
                   ${course.description || ""}
                 </p>
@@ -250,45 +258,64 @@ document.addEventListener("DOMContentLoaded", function () {
                 <div class="flex flex-col">
                   <span class="text-sm text-gray-500">Difficulty</span>
                   <span class="font-semibold">
-                    ${
-                      courseData.avgDifficulty > 0
-                        ? `${courseData.avgDifficulty.toFixed(1)}/5`
-                        : "N/A"
-                    }
+                    ${courseData.avgDifficulty > 0
+        ? `${courseData.avgDifficulty.toFixed(1)}/5`
+        : "N/A"
+      }
                   </span>
                 </div>
                 <div class="flex flex-col">
                   <span class="text-sm text-gray-500">Workload</span>
                   <span class="font-semibold">
-                    ${
-                      courseData.avgWorkload > 0
-                        ? `${courseData.avgWorkload.toFixed(1)}/5`
-                        : "N/A"
-                    }
+                    ${courseData.avgWorkload > 0
+        ? `${courseData.avgWorkload.toFixed(1)}/5`
+        : "N/A"
+      }
                 </span>
               </div>
             </div>
   
             <div class="mb-4">
               <span class="font-semibold">Terms Offered: </span>
-              <span>${
-                courseData.term_offered.length > 0
-                  ? courseData.term_offered.join(", ")
-                  : "Not specified"
-              }</span>
+              <span>${courseData.term_offered.length > 0
+        ? courseData.term_offered.join(", ")
+        : "Not specified"
+      }</span>
             </div>
   
             <div class="mb-4">
               <span class="font-semibold">Distributions: </span>
-              <span>${
-                courseData.distributions.length > 0
-                  ? courseData.distributions.join(", ")
-                  : "None"
-              }</span>
+              <span>${courseData.distributions.length > 0
+        ? courseData.distributions.join(", ")
+        : "None"
+      }</span>
             </div>
           </div>
         </div>
+    // < !--Relevance Feedback Buttons-- >
+
+        <div class="mt-4 flex gap-2">
+      <button
+        type="button"
+        data-relevant-btn
+        data-idx="${courseData.course_code}"
+        class="px-3 py-1 rounded bg-gray-200"
+      >
+        ✅ Relevant
+      </button>
+      <button
+        type="button"
+        data-nonrelevant-btn
+        data-idx="${courseData.course_code}"
+        class="px-3 py-1 rounded bg-gray-200"
+      >
+        ❌ Not Relevant
+      </button>
+    </div>
       `;
+    // < !--Relevance Feedback Buttons-- >
+
+
 
     detailsHtml += `<h2 class="text-xl font-semibold my-4">Reviews</h2><div class="space-y-6">`;
 
@@ -386,9 +413,9 @@ document.addEventListener("DOMContentLoaded", function () {
         <div class="mt-6">
           <a 
             href="/class/${courseData.course_code.replace(
-              /\s+/g,
-              "-"
-            )}?data=${encodeURIComponent(JSON.stringify(courseDataForLink))}"
+      /\s+/g,
+      "-"
+    )}?data=${encodeURIComponent(JSON.stringify(courseDataForLink))}"
             class="inline-block w-full px-4 py-2 bg-black hover:bg-gray-700 text-white text-center font-medium rounded-md"
           >
             See more about class
@@ -397,6 +424,30 @@ document.addEventListener("DOMContentLoaded", function () {
       `;
 
     courseDetails.innerHTML = detailsHtml;
+
+    const relBtn = courseDetails.querySelector("[data-relevant-btn]");
+    const nonRelBtn = courseDetails.querySelector("[data-nonrelevant-btn]");
+    const cid = course.course_code;
+
+    relBtn.addEventListener("click", () => {
+      if (!relevantIds.includes(cid)) relevantIds.push(cid);
+      // if previously marked non-relevant, unmark
+      nonRelevantIds = nonRelevantIds.filter(id => id !== cid);
+      // optional: visual toggle
+      relBtn.classList.add("bg-green-200");
+      nonRelBtn.classList.remove("bg-red-200");
+      fetchSearchResults(window.query);
+    });
+
+    nonRelBtn.addEventListener("click", () => {
+      if (!nonRelevantIds.includes(cid)) nonRelevantIds.push(cid);
+      relevantIds = relevantIds.filter(id => id !== cid);
+      nonRelBtn.classList.add("bg-red-200");
+      relBtn.classList.remove("bg-green-200");
+      fetchSearchResults(window.query);
+    });
+
+
   }
 
   function renderStarsClient(rating, maxRating = 5) {

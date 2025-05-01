@@ -262,6 +262,22 @@ def simple_search(query, courses):
 def api_search():
     try:
         query = request.args.get('q', '')
+
+
+        #### ROCCHIO
+        import ast
+
+        relevant_ids = request.args.get('relevant_ids', None)
+        non_relevant_ids = request.args.get('non_relevant_ids', None)
+
+        # Parse them safely
+        relevant_ids = ast.literal_eval(relevant_ids) if relevant_ids else []
+        non_relevant_ids = ast.literal_eval(non_relevant_ids) if non_relevant_ids else []
+        print(relevant_ids)
+        print(non_relevant_ids)
+
+
+        #### ROCCHIO
         
         if not query:
             return jsonify([])
@@ -290,6 +306,26 @@ def api_search():
             else:
                 print("Using simple search fallback")
                 search_results = simple_search(query, courses_list)
+        #### ROCCHIO
+                
+        rel_codes = relevant_ids  # list of strings
+        rel_indices = [ course_codes.index(c) for c in rel_codes if c in course_codes ]
+        nonrel_codes = non_relevant_ids
+        nonrel_indices = [ course_codes.index(c) for c in nonrel_codes if c in course_codes ]
+        if relevant_ids or non_relevant_ids:
+            print("Applying Rocchio adjustment based on feedback")
+            relevant_vectors = [bert_embeddings[i] for i in rel_indices]
+            non_relevant_vectors = [bert_embeddings[i] for i in nonrel_indices]
+
+            # Assuming bert_search(query) uses embeddings
+            query_vector = encode_query_with_bert(query)  # you might have a function like this
+            
+            updated_query_vector = rocchio_update(query_vector, relevant_vectors, non_relevant_vectors)
+            
+            # Now re-search using the adjusted query vector
+            search_results = bert_search_with_query_vector(updated_query_vector, top_k=20)
+
+        #### ROCCHIO
         
         keyword_search_results = search_function(query, inv_idx, idf, doc_norms)
         keyword_score_map = {idx: round(score * 100, 0) for score, idx, *_ in keyword_search_results}
@@ -359,6 +395,83 @@ def api_search():
     
     except Exception as e:
         print(f"Error in api_search: {str(e)}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    
+    
+@app.route("/api/course", methods=["GET"])
+def get_similar_course():
+    try:
+        query_code = request.args.get('q', '').strip()
+        if not query_code:
+            return jsonify({"error": "Missing course code"}), 400
+
+        if query_code not in course_codes:
+            return jsonify({"error": "Invalid course code"}), 404
+
+        # Get the index and BERT embedding of the course
+        course_idx = course_codes.index(query_code)
+        query_embedding = bert_embeddings[course_idx]
+
+        # Get top matches using BERT
+        similarities = cosine_similarity([query_embedding], bert_embeddings)[0]
+        top_indices = similarities.argsort()[::-1][:20]  # Include original for now
+
+        # Exclude the original course itself
+        top_indices = [i for i in top_indices if i != course_idx][:10]
+
+        query_sentiment = course_sentiments.get(query_code, 0)
+
+        # Adjust BERT scores with sentiment
+        base_results = [(similarities[i], i) for i in top_indices]
+        rescored = adjust_bert_scores_with_sentiment(query_sentiment, course_sentiments, base_results, course_codes, alpha=0.3)
+
+        # Prepare helper maps
+        course = courses_list[course_idx]
+        course_title = course.get("course title") or course.get("title") or ""
+        title_score_map = get_bert_title_similarity_scores(course_title)
+        keyword_score_map = compute_keyword_scores(course.get("description", ""), inv_idx, idf, doc_norms, tokenizer, stop_words, punctuation)
+
+        formatted_results = []
+        seen_descriptions = set()
+
+        for sim_score, idx in sorted(rescored, key=lambda x: -x[0]):
+            if idx < len(courses_list):
+                course_data = courses_list[idx]
+                description = course_data.get("description", "")
+                if description and description not in seen_descriptions:
+                    seen_descriptions.add(description)
+                    course_copy = course_data.copy()
+                    if "description_tokens" in course_copy:
+                        del course_copy["description_tokens"]
+
+                    course_code = course_copy.get("course_code")
+
+                    course_copy["BERT_similarity_score"] = round(sim_score * 100, 0)
+                    course_copy["sentiment_score"] = scaled_sentiments.get(course_code, 50)
+
+                    idx_in_list = next((i for i, c in enumerate(courses_list) if c.get("course_code") == course_code), None)
+                    course_copy["keyword_score"] = round(keyword_score_map.get(idx_in_list, 0) * 100, 0)
+
+                    course_copy["BERT_title_similarity_score"] = round(title_score_map.get(course_code, 0) * 100, 0)
+
+                    course_copy["svd_top_words"] = get_svd_matching_words(
+                        course.get("description", ""),
+                        course_copy.get("description", ""),
+                        vectorizer,
+                        svd,
+                        tokenizer
+                    )
+
+                    ratings = calculate_average_ratings(course_copy.get("reviews", []))
+                    course_copy.update(ratings)
+
+                    formatted_results.append(course_copy)
+
+        return jsonify(formatted_results)
+
+    except Exception as e:
+        print(f"Error in get_similar_course: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -468,6 +581,35 @@ def class_details(course_id):
         print(f"Error rendering class details: {str(e)}")
         traceback.print_exc()
         return render_template('class_details.html', error=f"Error loading course: {str(e)}", class_data=None)
+    
+
+##### ROCCHIO
+def rocchio_update(query_vector, relevant_vectors, non_relevant_vectors, alpha=1.0, beta=0.75, gamma=0.25):
+    import numpy as np
+    
+    if not relevant_vectors:
+        relevant_centroid = np.zeros_like(query_vector)
+    else:
+        relevant_centroid = np.mean(relevant_vectors, axis=0)
+        
+    if not non_relevant_vectors:
+        non_relevant_centroid = np.zeros_like(query_vector)
+    else:
+        non_relevant_centroid = np.mean(non_relevant_vectors, axis=0)
+        
+    updated_query = alpha * query_vector + beta * relevant_centroid - gamma * non_relevant_centroid
+    return updated_query
+
+def encode_query_with_bert(query):
+    return bert_model.encode([query])[0]  # [0] to get just the vector, not a list of one
+
+def bert_search_with_query_vector(query_vector, top_k=10):
+    similarities = cosine_similarity([query_vector], bert_embeddings)[0]
+    top_indices = similarities.argsort()[::-1][:top_k]
+    results = [(similarities[i], i) for i in top_indices]
+    return results
+
+#### ROCCHIO
     
 
 if __name__ == '__main__':
