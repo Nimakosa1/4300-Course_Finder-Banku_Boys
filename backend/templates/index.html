@@ -1,7 +1,9 @@
 {% extends "base.html" %} {% block title %}CourseFinder - Find Your Perfect
 Class{% endblock %} {% block content %}
 <div class="flex h-screen w-full overflow-hidden">
-  <div class="w-1/2 bg-[#CACACA] flex flex-col items-center justify-center px-8">
+  <div
+    class="w-1/2 bg-[#CACACA] flex flex-col items-center justify-center px-8"
+  >
     <h1 class="text-5xl md:text-6xl font-bold text-black mb-6">CourseFinder</h1>
 
     <div class="w-full max-w-xl mb-8">
@@ -9,29 +11,106 @@ Class{% endblock %} {% block content %}
         Find classes easily with natural language
       </p>
 
-      <form action="{{ url_for('search_page') }}" method="GET" class="flex w-full">
-        <input type="text" name="q" placeholder="Search for classes"
-          class="flex-grow bg-white/90 text-black text-lg placeholder:text-gray-500 rounded-l-lg rounded-r-none border-0 p-3" />
-        <button type="submit"
-          class="bg-black hover:bg-gray-700 text-white rounded-l-none rounded-r-lg px-6 text-lg cursor-pointer">
-          Search
-        </button>
+      <form
+        action="{{ url_for('search_page') }}"
+        method="GET"
+        id="search-form"
+        class="flex w-full flex-col"
+      >
+        <div class="flex w-full">
+          <input
+            type="text"
+            name="q"
+            id="search-input"
+            placeholder="Search for classes"
+            class="flex-grow bg-white/90 text-black text-lg placeholder:text-gray-500 rounded-l-lg rounded-r-none border-0 p-3"
+          />
+          <button
+            type="submit"
+            class="bg-black hover:bg-gray-700 text-white rounded-l-none rounded-r-lg px-6 text-lg cursor-pointer"
+          >
+            Search
+          </button>
+          <input type="hidden" id="search-mode" name="mode" value="keyword" />
+        </div>
+
+        <div class="flex justify-center mt-3">
+          <button
+            type="button"
+            id="toggle-search-mode"
+            class="text-black hover:text-blue-800 text-sm font-medium underline"
+          >
+            Search for similar courses instead
+          </button>
+        </div>
       </form>
+    </div>
+  </div>
+
+  <div
+    id="course-select-modal"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden"
+  >
+    <div
+      class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+    >
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">Select a Course</h2>
+        <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+          <svg
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            ></path>
+          </svg>
+        </button>
+      </div>
+      <div class="mb-4">
+        <input
+          type="text"
+          id="course-search"
+          placeholder="Search for a course (e.g. CS 1110, INFO 4300)"
+          class="w-full p-2 border border-gray-300 rounded-md"
+        />
+      </div>
+      <div id="course-list" class="overflow-y-auto flex-grow">
+        <p class="text-gray-500 text-center py-4">Loading courses...</p>
+      </div>
     </div>
   </div>
 
   <div class="w-1/2 relative">
     <div class="w-full h-full absolute inset-0 z-0">
-      <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.86/build/spline-viewer.js" async></script>
-      <spline-viewer loading-anim-type="spinner-small-dark"
-        url="https://prod.spline.design/WbCrNzKYlLSKG7cz/scene.splinecode"><img
+      <script
+        type="module"
+        src="https://unpkg.com/@splinetool/viewer@1.9.86/build/spline-viewer.js"
+        async
+      ></script>
+      <spline-viewer
+        loading-anim-type="spinner-small-dark"
+        url="https://prod.spline.design/WbCrNzKYlLSKG7cz/scene.splinecode"
+        ><img
           src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAATCAYAAADxlA/3AAAJ+ElEQVR4AQCBAH7/AH13dgB8dnUAenNyAHhwcAB1bG0AdGprAHVpawB3amwAe21wAIFxdQCJd3wAkH2CAJaDiQCbh40AnoqPBp2JjxKZhosdkn+EKIh3fDF9bnI3cmVnO2ddXjtfVlY4WVNSMlZTUChWVVIdWVpWEF5hWwNkaGIAaW9oAG10bQBwd28AAIEAfv8AfXd2AHx2dQB6c3IAd3BwAHVtbQB0amsAdWlrAHdqbQB7bXAAgXJ1AIh3fACQfoMAloSJAJuIjgSeipAPnYqPG5mGiyaSgIUxiHh8OX1vcj9yZmhDaF1eQl9XVz9ZVFI4VlRRLldWUiJaW1YVXmJcB2RqYwBqcGkAbnZuAHB4cAAAgQB+/wB8eHYAe3d1AHl0cgB3cXAAdW1tAHRrawB0amsAd2ttAHtucACBc3YAiHl8AJB/gwCWhYoJm4mOFJ6LkR+di5ArmYiMNpKChkCJen1IfnFzTnJnaVBoX2BPYFlYS1pWVENXVlI4WFhUK1teWB1fZV4PZWxlAmtzawBveHAAcntyAACBAH7/AHt5dgB6d3UAeHVyAHZxcAB0bm0Ac2xsAHRrawB2bG0Ae29xAIF0dgCIen0HkICEEZaGihybi48ono2RNJ2NkUCZio1LkoSHVIl8flx+c3Rgc2pqYWliYV9hXFpZW1lWUFhYVERZW1Y2XGFaJ2FoYBhnb2cLbHZtAHF7cgBzfnUAAIEAfv8Ae3p2AHl4dQB4dnMAdXNwAHNvbQBybWwAc2xsAHZubgB6cXEFgXV3D4h8fhmQgoUlloiLMZuNkD2ej5NKnY+SVpqMj2CThohpin6AcH91dnN0bGxzamVjcGJfXGhcXFheWlxXUVpfWUFeZF0xY2tjIWlzahNuenAHc391AHWCeAAAgQB+/wB6e3YAeXl1AHd3cwB0dHAAc3FuAHJubABzbmwAdW9uB3pychKAd3geiH1/K4+EhjiWioxFnI+RUp6RlF+ekZRrmo6QdZOJin2KgYKDgHh4hXVvboRraGV/Y2Jedl5fWmpbX1lcXGJbS19oYDplb2Ypa3dtGnF+cw11g3gEd4Z7AACBAH7/AHl7dgB4enUAdnhzAHR0cABycm4AcXBsAHJvbAV1cG8RenRzHoB5eCyIf387kIaHSZeMjVickZJmn5OVc56TlX+bkJGJlIuLkIuDg5WBe3qWdnJwk2xrZ41kZWGDX2Jddl1jXGZeZl5VYWxiQmdzaTFte3Ahc4J2FHeIewt6i34GAIEAfv8AeHx2AHd7dQB1eHMAc3VwAHJybgBxcG0BcnBtDnVxbxx6dXMrgHp5O4iAgEuQh4dbl42OapySk3mflZaGn5WWkpuSk5yVjY2ijIWFpoF9e6Z3dHKjbW1pm2VoYpBgZV+CXmVecV9pYF9jb2VMaXZrOm9+cyp1hnkceYt+E3yOgQ4AgQB+/wB4fHYAd3t1AHV5cwBzdnAAcXNuAHFxbQpycW0ZdXJvKXp2dDqAe3pLiIGBXZCIiG6Xj49+nJSUjZ+Wl5qflpemnJSUr5WOjrWMh4a4gn58t3h2c7Nub2qqZmlkn2FnYJBfaGB+YWtibGVxZ1hqeW5GcYF1NneIeyh7joEffpGDGgCBAH7/AHh8dgB3e3UAdXlzAHN2cABxc24JcXFtGHJxbSh1c3A6enZ0TIF7el6IgoFwkImIgpePj5KdlJShoJeXrp+Xl7mclJTClo+Ox42IhsmDf33IeHdzw29wa7pna2WuYmhhnmBpYY1ibWN6ZnNoZ2x7b1Vyg3ZEeIp9N32Qgi6Ak4UpAIEAfv8AeHx2AHd7dQB1eXMCc3ZwDHJzbhlxcW0pcnFuOnVycEx6dnRegXt6cYmCgYORiYmVmI+QpZ2UlbSgl5jBoJeXy5yUlNOWj47XjYiG2YN/fdd5d3TRb3BryGhrZbxjaGKsYWlhm2NtZIlndGl2bXtwZHOEd1R5i35HfpGDPoGUhjkAgQB+/wB5fHYGeHp1CnZ4cxF0dXEbcnJuKXJxbThzcG5KdnJwXHt2dG+Ce3qBioGBk5GIiaSZj5C0npSVwqGWl82glpfXnZSU3paOjuKNh4big3594Hl2c9pvb2vRaGplxGNoYbZiaWGlY21kk2dzaYFte3BwdIN4YXqLf1R/kYRMgpSHRwCBAH7/AHl7dhF4eXUVd3dzHHV0cSdzcm40c3BtQ3RwblR3cXBmfHV0eIN6eoqKgYGbkoeJq5mOj7qek5TGoZWX0aGVl9mdkpTflo2O4o6FheKDfXzfeXVz2W9uatBoaWTEY2ZhtmJnYaZja2OVaHJphG56cHR0gndle4p+Wn+QhFGCk4ZNAIEAfv8Aenp2FHl4dRh4dnMfdnNxKXRxbjZ0b21FdW9uVXhwcGZ9dHR3hHl6iIt/gZiThoinmoyPs5+RlL+hlJfIoZSWz52Rk9OXi43VjoSF1YN7e9F5c3LLb2xpwmhnY7djZGCpYmZgmmNqYotocGh7bnhva3SBdl57iH1TgI6DTIKRhkgAgQB+/wB8eXYOe3d1Enl1cxh3cnEidXBuLnVubTx2bm5MeW9wXH5zdGuEeHp7jH6BiZSFiJaai4+hn5CTq6KSlrKhkpW4nY+Su5eJjLyOgYO7g3l6t3lxcbFvaWioaGRinWNiX5FhY16DY2dhdGduZ2Vtdm5XdH51S3uGfEB/jII5go+FNgCBAH7/AH14dgB8dnUCenRzCXhxcRJ2b24edm1tK3dsbjl6bnBIf3F0VoV2emSNfYFwlIOIfJuJjoWgjpONopCVk6GQlZeejZGal4eLmo1/gpiDd3mUeG5vjW9nZ4VnYmF7Y2Bdb2FhXWFjZWBUZ2xlRm10bDl0fHQteoR7JH+KgB2CjYMaAIEAfv8AfXd2AHx1dQB7c3MAeXBxAHdubgl3bG0VeGtuInttcDB/cHQ9hnV6SY18gFSVgodem4iOZqCNkm2ij5Vxoo6UdJ6LkHWXhYp1jX6BcoN1eG54bG5ob2VmX2dgYFViXlxKYV9cPmJjXzFnamQkbXJrGHR6cw16gnoEf4h/AIKLggAAgQB+/wB+dnYAfXV1AHtycwB5cHAAeG1uAHdrbQF4a24Oe2xwGoBwdCaGdXkyjnuAPJWBh0Sch41LoIySUaOOlFSijZNXnoqQV5eEiVaNfIFTg3R3TnhrbUhuZGVAZ19fNmJcWythXVsfYmJeE2ZoYwdtcGoAc3lyAHqAeQB/hn4AgYmBAAGBAH7/AH52dgB9dHUAfHJzAHpvcAB4bW4AeGttAHlqbQF8bHANgG90GYd0eSSOeoAtlYGHNZyHjTyhi5JBo42URKKNk0aeiY9Gl4OJRI18gEGDc3c8eGptNm5jZS5nXl4kYlxbGmBdWg5iYV0CZmdjAGxvagBzeHEAeoB5AH+GfgCBiYEA0WcLQoFqTDEAAAAASUVORK5CYII="
-          alt="Spline preview" style="width: 100%; height: 100%" /></spline-viewer>
+          alt="Spline preview"
+          style="width: 100%; height: 100%"
+      /></spline-viewer>
     </div>
 
-    <div id="course-wheel" class="absolute right-0 top-0 w-1/3 h-full z-10"></div>
+    <div
+      id="course-wheel"
+      class="absolute right-0 top-0 w-1/3 h-full z-10"
+    ></div>
   </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/course_wheel.js') }}"></script>
+<script src="{{ url_for('static', filename='js/search_bar.js') }}"></script>
+
 {% endblock %}

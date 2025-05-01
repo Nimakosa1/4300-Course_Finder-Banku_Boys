@@ -32,8 +32,10 @@ CourseFinder{% endblock %} {% block extra_head %}
 <div id="word-cloud-container"></div>
 {% endif %} {{ render_similarity_sidebar() }} {{ render_search_bar(query) }}
 
-<div id="main-content"
-  class="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6 mt-6 {% if query %}hidden{% endif %}">
+<div
+  id="main-content"
+  class="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6 mt-6 {% if query %}hidden{% endif %}"
+>
   {{ render_course_list(query) }} {{ render_course_details() }} {{
   render_filter_panel() }}
 </div>
@@ -47,4 +49,6 @@ CourseFinder{% endblock %} {% block extra_head %}
 <script src="{{ url_for('static', filename='js/word_cloud.js') }}"></script>
 <script src="{{ url_for('static', filename='js/similarity.js') }}"></script>
 <script src="{{ url_for('static', filename='js/search_results.js') }}"></script>
+<script src="{{ url_for('static', filename='js/search_bar.js') }}"></script>
+
 {% endblock %}
