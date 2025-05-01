@@ -1,0 +1,10 @@
+{
+  "/api/courses/search/route": "/api/courses/search",
+  "/api/debug/flask/route": "/api/debug/flask",
+  "/favicon.ico/route": "/favicon.ico",
+  "/_not-found/page": "/_not-found",
+  "/page": "/",
+  "/search/page": "/search",
+  "/debug/page": "/debug",
+  "/class/[id]/page": "/class/[id]"
+}
