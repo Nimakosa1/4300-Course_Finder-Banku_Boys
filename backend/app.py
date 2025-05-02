@@ -410,22 +410,17 @@ def get_similar_course():
         if query_code not in course_codes:
             return jsonify({"error": "Invalid course code"}), 404
 
-        #### ROCCHIO
         import ast
         relevant_ids = request.args.get('relevant_ids', None)
         non_relevant_ids = request.args.get('non_relevant_ids', None)
 
-        # Parse them safely
         relevant_ids = ast.literal_eval(relevant_ids) if relevant_ids else []
         non_relevant_ids = ast.literal_eval(non_relevant_ids) if non_relevant_ids else []
-        #### ROCCHIO
 
-        # Get the index and BERT embedding of the course
         course_idx = course_codes.index(query_code)
         query_embedding = bert_embeddings[course_idx]
 
-        #### ROCCHIO
-        # Apply Rocchio adjustment if feedback is provided
+       
         if relevant_ids or non_relevant_ids:
             print("Applying Rocchio adjustment based on feedback")
             rel_indices = [course_codes.index(c) for c in relevant_ids if c in course_codes]
@@ -436,25 +431,19 @@ def get_similar_course():
             
             updated_query_vector = rocchio_update(query_embedding, relevant_vectors, non_relevant_vectors)
             
-            # Get similarities using the updated query vector
             similarities = cosine_similarity([updated_query_vector], bert_embeddings)[0]
         else:
-            # Get similarities using original query vector
             similarities = cosine_similarity([query_embedding], bert_embeddings)[0]
-        #### ROCCHIO
 
-        top_indices = similarities.argsort()[::-1][:20]  # Include original for now
+        top_indices = similarities.argsort()[::-1][:20]  
 
-        # Exclude the original course itself
         top_indices = [i for i in top_indices if i != course_idx][:10]
 
         query_sentiment = course_sentiments.get(query_code, 0)
 
-        # Adjust BERT scores with sentiment
         base_results = [(similarities[i], i) for i in top_indices]
         rescored = adjust_bert_scores_with_sentiment(query_sentiment, course_sentiments, base_results, course_codes, alpha=0.3)
 
-        # Prepare helper maps
         course = courses_list[course_idx]
         course_title = course.get("course title") or course.get("title") or ""
         title_score_map = get_bert_title_similarity_scores(course_title)
@@ -612,7 +601,6 @@ def class_details(course_id):
         return render_template('class_details.html', error=f"Error loading course: {str(e)}", class_data=None)
     
 
-##### ROCCHIO
 def rocchio_update(query_vector, relevant_vectors, non_relevant_vectors, alpha=1.0, beta=0.75, gamma=0.25):
     import numpy as np
     
@@ -630,7 +618,7 @@ def rocchio_update(query_vector, relevant_vectors, non_relevant_vectors, alpha=1
     return updated_query
 
 def encode_query_with_bert(query):
-    return bert_model.encode([query])[0]  # [0] to get just the vector, not a list of one
+    return bert_model.encode([query])[0]  
 
 def bert_search_with_query_vector(query_vector, top_k=10):
     similarities = cosine_similarity([query_vector], bert_embeddings)[0]
@@ -638,7 +626,6 @@ def bert_search_with_query_vector(query_vector, top_k=10):
     results = [(similarities[i], i) for i in top_indices]
     return results
 
-#### ROCCHIO
     
 
 if __name__ == '__main__':

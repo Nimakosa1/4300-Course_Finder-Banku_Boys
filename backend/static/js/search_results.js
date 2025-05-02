@@ -1,4 +1,3 @@
-// keep in module scope
 let relevantIds = [];
 let nonRelevantIds = [];
 
@@ -450,13 +449,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     relBtn.addEventListener("click", () => {
       if (!relevantIds.includes(cid)) relevantIds.push(cid);
-      // if previously marked non-relevant, unmark
       nonRelevantIds = nonRelevantIds.filter((id) => id !== cid);
-      // optional: visual toggle
       relBtn.classList.add("bg-green-200");
       nonRelBtn.classList.remove("bg-red-200");
-      // Add debug log to check if this function is being called
-      console.log("Relevant clicked, IDs:", relevantIds, nonRelevantIds);
       fetchSearchResults(window.query);
     });
 
@@ -465,8 +460,6 @@ document.addEventListener("DOMContentLoaded", function () {
       relevantIds = relevantIds.filter((id) => id !== cid);
       nonRelBtn.classList.add("bg-red-200");
       relBtn.classList.remove("bg-green-200");
-      // Add debug log to check if this function is being called
-      console.log("Non-relevant clicked, IDs:", relevantIds, nonRelevantIds);
       fetchSearchResults(window.query);
     });
   }
