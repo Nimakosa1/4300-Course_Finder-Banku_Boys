@@ -81,6 +81,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (searchMode === "similar") {
       const params = new URLSearchParams({
         q: query,
+        relevant_ids: JSON.stringify(relevantIds),
+        non_relevant_ids: JSON.stringify(nonRelevantIds),
       });
       apiUrl = `/api/course?${params.toString()}`;
     } else {
@@ -315,7 +317,9 @@ document.addEventListener("DOMContentLoaded", function () {
         type="button"
         data-relevant-btn
         data-idx="${courseData.course_code}"
-        class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 hover:-translate-y-0.5 transition-all duration-100 shadow-sm hover:shadow"
+        class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 hover:-translate-y-0.5 transition-all duration-100 shadow-sm hover:shadow ${
+          relevantIds.includes(courseData.course_code) ? "bg-green-200" : ""
+        }"
       >
         ✅ Relevant
       </button>
@@ -323,7 +327,9 @@ document.addEventListener("DOMContentLoaded", function () {
         type="button"
         data-nonrelevant-btn
         data-idx="${courseData.course_code}"
-        class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 hover:-translate-y-0.5 transition-all duration-100 shadow-sm hover:shadow"
+        class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 hover:-translate-y-0.5 transition-all duration-100 shadow-sm hover:shadow ${
+          nonRelevantIds.includes(courseData.course_code) ? "bg-red-200" : ""
+        }"
       >
         ❌ Not Relevant
       </button>
@@ -449,6 +455,8 @@ document.addEventListener("DOMContentLoaded", function () {
       // optional: visual toggle
       relBtn.classList.add("bg-green-200");
       nonRelBtn.classList.remove("bg-red-200");
+      // Add debug log to check if this function is being called
+      console.log("Relevant clicked, IDs:", relevantIds, nonRelevantIds);
       fetchSearchResults(window.query);
     });
 
@@ -457,6 +465,8 @@ document.addEventListener("DOMContentLoaded", function () {
       relevantIds = relevantIds.filter((id) => id !== cid);
       nonRelBtn.classList.add("bg-red-200");
       relBtn.classList.remove("bg-green-200");
+      // Add debug log to check if this function is being called
+      console.log("Non-relevant clicked, IDs:", relevantIds, nonRelevantIds);
       fetchSearchResults(window.query);
     });
   }
