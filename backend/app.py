@@ -402,6 +402,7 @@ def api_search():
 @app.route("/api/course", methods=["GET"])
 def get_similar_course():
     try:
+        print(request.args)
         query_code = request.args.get('q', '').strip()
         if not query_code:
             return jsonify({"error": "Missing course code"}), 400
@@ -409,12 +410,39 @@ def get_similar_course():
         if query_code not in course_codes:
             return jsonify({"error": "Invalid course code"}), 404
 
+        #### ROCCHIO
+        import ast
+        relevant_ids = request.args.get('relevant_ids', None)
+        non_relevant_ids = request.args.get('non_relevant_ids', None)
+
+        # Parse them safely
+        relevant_ids = ast.literal_eval(relevant_ids) if relevant_ids else []
+        non_relevant_ids = ast.literal_eval(non_relevant_ids) if non_relevant_ids else []
+        #### ROCCHIO
+
         # Get the index and BERT embedding of the course
         course_idx = course_codes.index(query_code)
         query_embedding = bert_embeddings[course_idx]
 
-        # Get top matches using BERT
-        similarities = cosine_similarity([query_embedding], bert_embeddings)[0]
+        #### ROCCHIO
+        # Apply Rocchio adjustment if feedback is provided
+        if relevant_ids or non_relevant_ids:
+            print("Applying Rocchio adjustment based on feedback")
+            rel_indices = [course_codes.index(c) for c in relevant_ids if c in course_codes]
+            nonrel_indices = [course_codes.index(c) for c in non_relevant_ids if c in course_codes]
+            
+            relevant_vectors = [bert_embeddings[i] for i in rel_indices]
+            non_relevant_vectors = [bert_embeddings[i] for i in nonrel_indices]
+            
+            updated_query_vector = rocchio_update(query_embedding, relevant_vectors, non_relevant_vectors)
+            
+            # Get similarities using the updated query vector
+            similarities = cosine_similarity([updated_query_vector], bert_embeddings)[0]
+        else:
+            # Get similarities using original query vector
+            similarities = cosine_similarity([query_embedding], bert_embeddings)[0]
+        #### ROCCHIO
+
         top_indices = similarities.argsort()[::-1][:20]  # Include original for now
 
         # Exclude the original course itself
@@ -474,7 +502,8 @@ def get_similar_course():
         print(f"Error in get_similar_course: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
+    
+    
 @app.route("/api/course/<course_id>", methods=["GET"])
 def api_get_course(course_id):
     try:
