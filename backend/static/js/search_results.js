@@ -1,4 +1,3 @@
-// keep in module scope
 let relevantIds = [];
 let nonRelevantIds = [];
 
@@ -81,6 +80,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (searchMode === "similar") {
       const params = new URLSearchParams({
         q: query,
+        relevant_ids: JSON.stringify(relevantIds),
+        non_relevant_ids: JSON.stringify(nonRelevantIds),
       });
       apiUrl = `/api/course?${params.toString()}`;
     } else {
@@ -315,7 +316,9 @@ document.addEventListener("DOMContentLoaded", function () {
         type="button"
         data-relevant-btn
         data-idx="${courseData.course_code}"
-        class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 hover:-translate-y-0.5 transition-all duration-100 shadow-sm hover:shadow"
+        class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 hover:-translate-y-0.5 transition-all duration-100 shadow-sm hover:shadow ${
+          relevantIds.includes(courseData.course_code) ? "bg-green-200" : ""
+        }"
       >
         ✅ Relevant
       </button>
@@ -323,7 +326,9 @@ document.addEventListener("DOMContentLoaded", function () {
         type="button"
         data-nonrelevant-btn
         data-idx="${courseData.course_code}"
-        class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 hover:-translate-y-0.5 transition-all duration-100 shadow-sm hover:shadow"
+        class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 hover:-translate-y-0.5 transition-all duration-100 shadow-sm hover:shadow ${
+          nonRelevantIds.includes(courseData.course_code) ? "bg-red-200" : ""
+        }"
       >
         ❌ Not Relevant
       </button>
@@ -444,9 +449,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     relBtn.addEventListener("click", () => {
       if (!relevantIds.includes(cid)) relevantIds.push(cid);
-      // if previously marked non-relevant, unmark
       nonRelevantIds = nonRelevantIds.filter((id) => id !== cid);
-      // optional: visual toggle
       relBtn.classList.add("bg-green-200");
       nonRelBtn.classList.remove("bg-red-200");
       fetchSearchResults(window.query);
